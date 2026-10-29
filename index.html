@@ -867,10 +867,8 @@ a.qa-tile{text-decoration:none;color:inherit}
   <section id="welcome" class="hidden">
     <h2 class="sec">Quick actions</h2>
     <div class="qa">
-      <a class="qa-tile" id="qaQuiz" href="https://quiz-forge-99.preview.emergentagent.com" target="_blank" rel="noopener"><span class="ic" data-ico="quizzes"></span>Create quiz</a>
       <button type="button" class="qa-tile" id="qaLesson"><span class="ic" data-ico="lessons"></span>Add lesson</button>
       <button type="button" class="qa-tile" id="qaGroup"><span class="ic" data-ico="groups"></span>New group</button>
-      <button type="button" class="qa-tile" id="qaResults"><span class="ic" data-ico="results"></span>View results</button>
       <button type="button" class="qa-tile" id="qaCalendar"><span class="ic" data-ico="calendar"></span>Calendar</button>
     </div>
     <div class="stats">
@@ -2079,7 +2077,6 @@ $('goLessons').onclick = () => goto('lessons');
 $('goGroups').onclick = () => goto('groups');
 $('qaLesson').onclick = () => { goto('lessons'); $('lessonTitle').focus(); };
 $('qaGroup').onclick = () => { goto('groups'); showGact('create'); $('groupName').focus(); };
-$('qaResults').onclick = () => goto('results');
 $('qaCalendar').onclick = () => goto('calendar');
 let adminCalWeek = 0;
 function weekStartFor(offset) { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate() - n.getDay() + 7 * offset); }
