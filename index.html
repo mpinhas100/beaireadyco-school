@@ -1930,7 +1930,7 @@ async function loadSupabaseProfile() {
 }
 $('googleBtn').onclick = async () => {
   if (!sb) return msg($('authMsg'), 'Sign-in is not available right now. Please try again later.', true);
-  const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href.split('#')[0] } });
+  const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href.split('#')[0], queryParams: { prompt: 'select_account' } } });
   if (error) msg($('authMsg'), error.message, true);
 };
 (async () => { try { await loadSupabaseProfile(); } catch (e) { msg($('authMsg'), 'Something went wrong signing in. Please try again.', true); } })();
