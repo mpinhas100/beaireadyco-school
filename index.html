@@ -136,6 +136,15 @@ body:not(.role-child) .child-only{display:none!important}
 .wk-chip strong{display:block;font-size:14px}
 .wk-chip small{display:block;color:var(--muted);font-weight:500}
 .wk-head .s{display:none}
+.mo-grid{display:grid;grid-template-columns:repeat(6,minmax(120px,1fr));min-width:780px;border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+.mo-head{padding:8px;font-weight:800;font-size:13px;background:#f6f8ff;border-bottom:1px solid var(--line);text-align:center}
+.mo-cell{min-height:110px;padding:6px;border-top:1px solid var(--line);border-left:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
+.mo-cell.out{background:#fafbfd;color:#9aa3b2}
+.mo-cell.out .mo-num{color:#9aa3b2}
+.mo-num{font-weight:700;font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.seg button{border:0;border-radius:0;margin:0;padding:8px 14px;background:#fff;color:#1d2440;font-weight:700}
+.seg button[aria-pressed="true"]{background:#3b4bd8;color:#fff}
 @media (max-width:720px){
   .wk-scroll{overflow:visible}
   .wk-grid{min-width:0;grid-template-columns:44px repeat(6,minmax(0,1fr))}
@@ -824,11 +833,15 @@ a.qa-tile{text-decoration:none;color:inherit}
   <section id="adminCal" class="hidden">
     <h1>Calendar</h1>
     <div class="row" style="margin-bottom:12px">
-      <button type="button" class="secondary" id="acPrev">← Previous week</button>
-      <button type="button" class="secondary" id="acToday">This week</button>
-      <button type="button" class="secondary" id="acNext">Next week →</button>
+      <button type="button" class="secondary" id="acPrev">← Previous</button>
+      <button type="button" class="secondary" id="acToday">Today</button>
+      <button type="button" class="secondary" id="acNext">Next →</button>
       <strong id="acWeek" style="margin-left:6px"></strong>
-      <button type="button" id="acAdd" style="margin-left:auto">+ Add class</button>
+      <div class="seg" role="group" aria-label="Calendar view" style="margin-left:auto">
+        <button type="button" id="acViewWeek" aria-pressed="true">Week</button>
+        <button type="button" id="acViewMonth" aria-pressed="false">Month</button>
+      </div>
+      <button type="button" id="acAdd">+ Add class</button>
     </div>
     <div class="card hidden" id="acForm">
       <h2>Add a class</h2>
@@ -2092,7 +2105,8 @@ function weekGridEl(entries, cellFor, startDate) {
     const head = mk('div', { cls: 'wk-head' }, mk('span', { cls: 'l', text: DAY_NAMES[d] + dnum }), mk('span', { cls: 's', text: DAY_NAMES[d].slice(0, 3) + dnum }));
     grid.appendChild(head);
   }
-  const times = [...new Set(entries.map((e) => e.sl.time))].sort();
+  const base = []; for (let hr = 8; hr <= 20; hr += 1) base.push(`${pad2(hr)}:00`);
+  const times = [...new Set([...base, ...entries.map((e) => e.sl.time)])].sort();
   times.forEach((t) => {
     const h = parseTime(t);
     const hh = ((h.h + 11) % 12) + 1;
@@ -2106,6 +2120,36 @@ function weekGridEl(entries, cellFor, startDate) {
   });
   wrap.appendChild(grid);
   return wrap;
+}
+// Month view: Sunday to Friday, one row per week. Each class appears on every matching day.
+function monthGridEl(entries, cellFor, monthDate) {
+  const wrap = document.createElement('div');
+  wrap.className = 'wk-scroll';
+  const grid = document.createElement('div');
+  grid.className = 'mo-grid';
+  for (let d = 0; d < 6; d += 1) grid.appendChild(mk('div', { cls: 'mo-head', text: DAY_NAMES[d].slice(0, 3) }));
+  const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const gridStart = new Date(first.getFullYear(), first.getMonth(), 1 - first.getDay());
+  for (let w = 0; w < 6; w += 1) {
+    for (let d = 0; d < 6; d += 1) {
+      const day = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + w * 7 + d);
+      const cell = document.createElement('div');
+      cell.className = 'mo-cell' + (day.getMonth() !== monthDate.getMonth() ? ' out' : '');
+      cell.appendChild(mk('div', { cls: 'mo-num', text: String(day.getDate()) }));
+      entries.filter((e) => e.sl.day === day.getDay()).sort((a, b) => a.sl.time.localeCompare(b.sl.time)).forEach((e) => cell.appendChild(cellFor(e)));
+      grid.appendChild(cell);
+    }
+  }
+  wrap.appendChild(grid);
+  return wrap;
+}
+let adminCalMode = 'week';
+let adminCalMonth = 0;
+function setAdminCalMode(mode) {
+  adminCalMode = mode;
+  $('acViewWeek').setAttribute('aria-pressed', mode === 'week' ? 'true' : 'false');
+  $('acViewMonth').setAttribute('aria-pressed', mode === 'month' ? 'true' : 'false');
+  renderAdminCal();
 }
 function classChip(title, sub, onclick) {
   const b = document.createElement('button');
@@ -2123,15 +2167,22 @@ function entriesFor(groups) {
 }
 
 function renderAdminCal() {
-  const start = weekStartFor(adminCalWeek);
-  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 5);
-  $('acWeek').textContent = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
   $('acDetail').classList.add('hidden');
   const host = $('acGrid');
   host.innerHTML = '';
   const entries = entriesFor(DB.groups);
-  if (!entries.length) { host.appendChild(mk('p', { cls: 'muted', text: 'No classes yet.' })); return; }
-  host.appendChild(weekGridEl(entries, (e) => classChip(e.g.classTitle || e.g.name, `${DB.children.filter((c) => c.group_id === e.g.id).length} students`, () => showAdminClass(e.g, e.sl)), start));
+  const chip = (e) => { const n = DB.children.filter((c) => c.group_id === e.g.id).length; return classChip(e.g.classTitle || e.g.name, `${n} student${n === 1 ? '' : 's'}`, () => showAdminClass(e.g, e.sl)); };
+  if (adminCalMode === 'month') {
+    const n = new Date();
+    const m = new Date(n.getFullYear(), n.getMonth() + adminCalMonth, 1);
+    $('acWeek').textContent = m.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    host.appendChild(monthGridEl(entries, chip, m));
+    return;
+  }
+  const start = weekStartFor(adminCalWeek);
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 5);
+  $('acWeek').textContent = `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  host.appendChild(weekGridEl(entries, chip, start));
 }
 // Tapping a class in the admin calendar opens its details, with the meeting link.
 function showAdminClass(g, sl) {
@@ -2179,9 +2230,11 @@ function showAdminClass(g, sl) {
   close.onclick = () => box.classList.add('hidden');
   box.appendChild(close);
 }
-$('acPrev').onclick = () => { adminCalWeek -= 1; renderAdminCal(); };
-$('acNext').onclick = () => { adminCalWeek += 1; renderAdminCal(); };
-$('acToday').onclick = () => { adminCalWeek = 0; renderAdminCal(); };
+$('acPrev').onclick = () => { if (adminCalMode === 'month') adminCalMonth -= 1; else adminCalWeek -= 1; renderAdminCal(); };
+$('acNext').onclick = () => { if (adminCalMode === 'month') adminCalMonth += 1; else adminCalWeek += 1; renderAdminCal(); };
+$('acToday').onclick = () => { adminCalWeek = 0; adminCalMonth = 0; renderAdminCal(); };
+$('acViewWeek').onclick = () => setAdminCalMode('week');
+$('acViewMonth').onclick = () => setAdminCalMode('month');
 function openAcForm() {
   const t = $('acTeacher');
   t.innerHTML = '';
