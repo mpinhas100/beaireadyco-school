@@ -1837,6 +1837,79 @@ const SUPA_URL = 'https://jgcfyfsujbtucykmsqnw.supabase.co';
 const SUPA_KEY = 'sb_publishable_TNPX4iBAwaAuU8ukeaKJgg_5WQb-Iun';
 const sb = (window.supabase && window.supabase.createClient) ? window.supabase.createClient(SUPA_URL, SUPA_KEY) : null;
 // Looks up the signed-in person's profile. Admins use the staff views in this build.
+/* ---------- Staff data in Supabase (Phase 1: lessons, quizzes, classes) ---------- */
+const isUuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+const newId = () => crypto.randomUUID();
+function replaceAll(arr, items) { arr.splice(0, arr.length, ...items); }
+function clearStaffData() { replaceAll(DB.lessons, []); replaceAll(DB.quizzes, []); replaceAll(DB.groups, []); }
+async function loadStaffData() {
+  if (!sb) return;
+  const [L, Q, QQ, G, GL] = await Promise.all([
+    sb.from('lessons').select('id,title,teacher_notes,slides').order('created_at'),
+    sb.from('quizzes').select('id,title,access_code,lesson_id').order('created_at'),
+    sb.from('quiz_questions').select('quiz_id,question,choices,correct_index,position').order('position'),
+    sb.from('groups').select('*').order('created_at'),
+    sb.from('group_lessons').select('group_id,lesson_id').order('sort_order'),
+  ]);
+  const bad = [L, Q, QQ, G, GL].find((x) => x.error);
+  if (bad) throw new Error(bad.error.message);
+  replaceAll(DB.lessons, L.data.map((l) => ({ id: l.id, title: l.title, teacherNotes: l.teacher_notes || '', slides: l.slides || [], classId: null })));
+  replaceAll(DB.quizzes, Q.data.map((q) => ({
+    id: q.id, title: q.title, code: q.access_code, lessonId: q.lesson_id,
+    questions: QQ.data.filter((x) => x.quiz_id === q.id).map((x) => ({ question: x.question, choices: x.choices, correct: x.correct_index })),
+  })));
+  replaceAll(DB.groups, G.data.map((g) => {
+    const slots = Array.isArray(g.slots) && g.slots.length ? g.slots : (g.schedule_day != null ? [{ day: g.schedule_day, time: g.schedule_time, minutes: g.schedule_minutes }] : []);
+    return {
+      id: g.id, name: g.name, school: g.school || '', section: g.section || '', classTitle: g.class_title || g.name,
+      teacherId: g.teacher_id || null, lessonIds: GL.data.filter((x) => x.group_id === g.id).map((x) => x.lesson_id),
+      currentLessonId: g.current_lesson_id || null, slots, schedule: slots[0] || null,
+      format: g.format || 'in-person', zoomUrl: g.zoom_url || '', inviteCode: g.invite_code || '',
+    };
+  }));
+}
+// Saves lessons, quizzes and classes. Returns an error message, or null on success.
+async function saveStaffData() {
+  if (!sb || !me || !['admin', 'staff'].includes(me.dbRole)) return null;
+  const up = (v) => (isUuid(v) ? v : null);
+  let r;
+  const lessons = DB.lessons.filter((l) => isUuid(l.id));
+  if (lessons.length) {
+    r = await sb.from('lessons').upsert(lessons.map((l) => ({ id: l.id, title: l.title, teacher_notes: l.teacherNotes || null, slides: l.slides || [] })));
+    if (r.error) return r.error.message;
+  }
+  const quizzes = DB.quizzes.filter((q) => isUuid(q.id));
+  if (quizzes.length) {
+    r = await sb.from('quizzes').upsert(quizzes.map((q) => ({ id: q.id, title: q.title, access_code: q.code, lesson_id: up(q.lessonId) })));
+    if (r.error) return r.error.message;
+    r = await sb.from('quiz_questions').delete().in('quiz_id', quizzes.map((q) => q.id));
+    if (r.error) return r.error.message;
+    const qq = [];
+    quizzes.forEach((q) => q.questions.forEach((x, i) => qq.push({ quiz_id: q.id, question: x.question, choices: x.choices, correct_index: x.correct, position: i })));
+    if (qq.length) { r = await sb.from('quiz_questions').insert(qq); if (r.error) return r.error.message; }
+  }
+  const groups = DB.groups.filter((g) => isUuid(g.id));
+  if (groups.length) {
+    r = await sb.from('groups').upsert(groups.map((g) => {
+      const sl = slotsOf(g); const first = sl[0] || {};
+      return {
+        id: g.id, name: g.name, school: g.school || null, section: g.section || null, class_title: g.classTitle || null,
+        teacher_id: up(g.teacherId), format: g.format || null, zoom_url: g.zoomUrl || null, invite_code: g.inviteCode || null,
+        current_lesson_id: up(g.currentLessonId), slots: sl, schedule_day: first.day ?? null, schedule_time: first.time || null, schedule_minutes: first.minutes || null,
+      };
+    }));
+    if (r.error) return r.error.message;
+    r = await sb.from('group_lessons').delete().in('group_id', groups.map((g) => g.id));
+    if (r.error) return r.error.message;
+    const gl = [];
+    groups.forEach((g) => (g.lessonIds || []).filter(isUuid).forEach((lid, i) => gl.push({ group_id: g.id, lesson_id: lid, sort_order: i })));
+    if (gl.length) { r = await sb.from('group_lessons').insert(gl); if (r.error) return r.error.message; }
+  }
+  return null;
+}
+function persistStaff(el) {
+  saveStaffData().then((err) => { if (err && el) msg(el, `Could not save to the database: ${err}`, true); });
+}
 async function loadSupabaseProfile() {
   if (!sb) return;
   const { data } = await sb.auth.getSession();
@@ -1850,6 +1923,9 @@ async function loadSupabaseProfile() {
   }
   const role = prof.role === 'admin' ? 'staff' : prof.role;
   me = { id: user.id, name: prof.full_name || user.email, email: user.email, role, dbRole: prof.role };
+  if (['admin', 'staff', 'teacher'].includes(prof.role)) {
+    try { await loadStaffData(); } catch (e) { msg($('authMsg'), `Could not load classes: ${e.message}`, true); }
+  }
   afterLogin();
 }
 $('googleBtn').onclick = async () => {
@@ -1886,6 +1962,7 @@ $('forgotBtn').onclick = () => msg($('authMsg'), 'Please sign in with Google. If
 $('helpBtn').onclick = () => msg($('authMsg'), 'Email beaireadyco@gmail.com and we will help you get in.');
 async function signOut() {
   if (sb) { try { await sb.auth.signOut(); } catch (e) {} }
+  clearStaffData();
   me = null;
   document.body.classList.remove('role-parent');
   document.body.classList.remove('role-teacher');
@@ -2075,7 +2152,7 @@ function showAdminClass(g, sl) {
     change.type = 'button';
     change.className = 'secondary';
     change.textContent = 'Change link';
-    change.onclick = () => { g.zoomUrl = ''; showAdminClass(g, sl); };
+    change.onclick = () => { g.zoomUrl = ''; persistStaff(null); showAdminClass(g, sl); };
     box.appendChild(change);
   } else {
     const inp = document.createElement('input');
@@ -2090,6 +2167,7 @@ function showAdminClass(g, sl) {
       if (!/^https?:\/\//.test(v)) { inp.setCustomValidity('Paste a full link starting with https://'); inp.reportValidity(); return; }
       inp.setCustomValidity('');
       g.zoomUrl = v;
+      persistStaff(null);
       showAdminClass(g, sl);
     };
     box.append(inp, save);
@@ -2135,7 +2213,7 @@ $('acFormEl').onsubmit = (e) => {
   const slot = { day: Number(day), time, minutes: mins };
   const hm = parseTime(time);
   DB.groups.push({
-    id: uid('g'),
+    id: newId(),
     name: `${DAY_NAMES[slot.day]} ${fmtClock(hm.h, hm.m)}`,
     school: '',
     section: '',
@@ -2148,6 +2226,7 @@ $('acFormEl').onsubmit = (e) => {
     format,
     zoomUrl: link,
   });
+  persistStaff($('acMsg'));
   e.target.reset();
   $('acForm').classList.add('hidden');
   renderAdminCal();
@@ -2382,7 +2461,8 @@ $('lessonForm').onsubmit = async (e) => {
   }
   if (!slides.length) return msg($('lessonMsg'), 'No pages or slides found in that file.', true);
   const typed = $('lessonTitle').value.trim();
-  DB.lessons.push({ id: uid('l'), title: typed || file.name.replace(/\.[a-z0-9]+$/i, ''), slides, classId: $('lessonClass').value || null });
+  DB.lessons.push({ id: newId(), title: typed || file.name.replace(/\.[a-z0-9]+$/i, ''), slides, classId: $('lessonClass').value || null });
+  persistStaff($('lessonMsg'));
   e.target.reset();
   msg($('lessonMsg'), `Lesson uploaded: ${slides.length} ${kind === 'pptx' ? 'slides' : 'pages'}.`);
   renderLessons();
@@ -2476,7 +2556,8 @@ $('quizBuildForm').onsubmit = (e) => {
     correct: Number(b.querySelector('.qcorrect').value),
   }));
   const code = newCode();
-  DB.quizzes.push({ id: uid('q'), title: $('quizTitleInput').value.trim(), code, lessonId: $('quizLesson').value || null, questions });
+  DB.quizzes.push({ id: newId(), title: $('quizTitleInput').value.trim(), code, lessonId: $('quizLesson').value || null, questions });
+  persistStaff($('quizMsg'));
   $('quizTitleInput').value = '';
   $('qBuilder').innerHTML = '';
   addQuestionBlock();
@@ -2559,7 +2640,7 @@ $('groupForm').onsubmit = (e) => {
   const clean = slots.map((sl) => ({ day: Number(sl.day), time: sl.time, minutes: sl.minutes }));
   const name = $('groupName').value.trim();
   DB.groups.push({
-    id: uid('g'),
+    id: newId(),
     name,
     classTitle: name,
     school: $('groupSchool').value.trim(),
@@ -2570,6 +2651,7 @@ $('groupForm').onsubmit = (e) => {
     lessonIds: [],
     currentLessonId: null,
   });
+  persistStaff($('groupsMsg'));
   e.target.reset();
   $('slotRows').innerHTML = '';
   addSlotRow();
@@ -2688,6 +2770,7 @@ function teacherRow(t) {
       mk('button', { type: 'button', cls: 'secondary', text: 'Edit', on: () => { ADMIN_UI.teacherEdit = t.id; renderGroups(); } }),
       deleteButton('Remove', () => {
         DB.groups.forEach((g) => { if (g.teacherId === t.id) g.teacherId = null; });
+        persistStaff($('groupsMsg'));
         delete DB.users[userKeyById(t.id)];
         msg($('groupsMsg'), `${t.name} removed. Their classes now need a teacher.`);
         renderGroups();
@@ -2832,7 +2915,7 @@ $('inviteForm').onsubmit = (e) => {
   e.preventDefault();
   const g = DB.groups.find((x) => x.id === $('inviteGroup').value);
   if (!g) return msg($('inviteMsg'), 'Create a group first.', true);
-  if (!g.inviteCode) g.inviteCode = newCode().slice(0, 8);
+  if (!g.inviteCode) { g.inviteCode = newCode().slice(0, 8); persistStaff(null); }
   $('inviteLink').value = `https://www.beaireadyco.com/app/school/?join=${g.inviteCode}`;
   msg($('inviteMsg'), 'Register link ready. Copy it and send it yourself.');
 };
