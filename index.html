@@ -9,7 +9,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gloock&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 
@@ -81,7 +80,6 @@ fieldset.q legend{padding:0 6px;font-weight:600}
   #printArea th,#printArea td{border-bottom:1px solid #ccc;padding:6px;text-align:left}
 }
 
-#protoBar{max-width:860px;margin:0 auto;padding:8px 16px 0;font-size:.8rem;color:var(--muted);text-align:center}
 .bigbtns{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
 .bigbtn{margin-top:0;padding:44px 16px;font-size:1.3rem;letter-spacing:.02em;background:#000;color:#fff;border-radius:16px}
 .bigbtn:hover{background:#1e3a8a}
@@ -100,7 +98,6 @@ fieldset.q legend{padding:0 6px;font-weight:600}
 .dots span{width:8px;height:8px;border-radius:50%;background:var(--line)}
 .dots span.on{background:var(--accent)}
 
-#protoBar{max-width:860px;margin:0 auto;padding:8px 16px 0;font-size:.8rem;color:var(--muted);text-align:center}
 .bigbtns{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
 .bigbtn{margin-top:0;padding:44px 16px;font-size:1.3rem;letter-spacing:.02em;background:#000;color:#fff;border-radius:16px}
 .bigbtn:hover{background:#1e3a8a}
@@ -164,7 +161,6 @@ body{color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helv
 .hidden{display:none!important}
 main{display:grid;grid-template-columns:248px minmax(0,1fr);grid-template-areas:"bar bar" "side top" "side body";grid-template-rows:auto auto 1fr;min-height:100vh;max-width:none!important;margin:0!important;padding:0!important}
 main.anon{grid-template-columns:minmax(0,1fr);grid-template-areas:"bar" "top" "body"}
-#protoBar{grid-area:bar;max-width:none!important;margin:0!important;padding:7px 16px!important;background:#fff4c2;color:#5c4500;font-size:12.5px;text-align:center}
 .topbar{grid-area:top;position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:14px;margin:0;padding:12px 28px;background:#fff;border-bottom:1px solid var(--line)}
 .topbar .logo{height:44px;width:auto;display:block}
 .topbar .tag{font-size:12px;letter-spacing:.32em;color:var(--muted);font-weight:700}
@@ -761,7 +757,6 @@ a.qa-tile{text-decoration:none;color:inherit}
 </head>
 <body>
 <main class="anon">
-  <div id="protoBar">Build 18:10 · Prototype with sample data. Nothing is saved to a database, and a refresh resets everything.</div>
 
   <header class="topbar">
     <button type="button" class="menu-btn" id="menuBtn" aria-label="Open menu" aria-controls="menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
@@ -1580,6 +1575,7 @@ a.qa-tile{text-decoration:none;color:inherit}
   <div id="printArea"></div>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 /* ---------- Sample data (prototype only) ---------- */
 const DB = {
@@ -1836,9 +1832,11 @@ function signInAs(role) {
   msg($('authMsg'), '');
   afterLogin();
 }
+/* ---------- Real sign-in (Supabase + Google) ---------- */
 const SUPA_URL = 'https://jgcfyfsujbtucykmsqnw.supabase.co';
 const SUPA_KEY = 'sb_publishable_TNPX4iBAwaAuU8ukeaKJgg_5WQb-Iun';
 const sb = (window.supabase && window.supabase.createClient) ? window.supabase.createClient(SUPA_URL, SUPA_KEY) : null;
+// Looks up the signed-in person's profile. Admins use the staff views in this build.
 async function loadSupabaseProfile() {
   if (!sb) return;
   const { data } = await sb.auth.getSession();
@@ -1850,37 +1848,16 @@ async function loadSupabaseProfile() {
     await sb.auth.signOut();
     return;
   }
-  me = { id: user.id, name: prof.full_name || user.email, email: user.email, role: prof.role };
+  const role = prof.role === 'admin' ? 'staff' : prof.role;
+  me = { id: user.id, name: prof.full_name || user.email, email: user.email, role, dbRole: prof.role };
   afterLogin();
 }
 $('googleBtn').onclick = async () => {
-  if (!sb) return msg($('authMsg'), 'Google sign-in is not available right now.', true);
+  if (!sb) return msg($('authMsg'), 'Sign-in is not available right now. Please try again later.', true);
   const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href.split('#')[0] } });
   if (error) msg($('authMsg'), error.message, true);
 };
-(async () => { try { await loadSupabaseProfile(); } catch (e) { /* stay on sign-in */ } })();
-function demoGooglePick() {
-  const box = $('googlePick');
-  const open = box.classList.contains('hidden');
-  box.classList.toggle('hidden', !open);
-  if (!open) return;
-  const ul = $('googleList');
-  ul.innerHTML = '';
-  Object.keys(DB.users).forEach((key) => {
-    const u = DB.users[key];
-    const li = document.createElement('li');
-    li.style.padding = '0';
-    li.style.border = '0';
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'secondary';
-    b.style.margin = '4px 0';
-    b.textContent = `${u.name} · ${roleLabel(u.role)} · ${u.email}`;
-    b.onclick = () => signInAs(key);
-    li.appendChild(b);
-    ul.appendChild(li);
-  });
-};
+(async () => { try { await loadSupabaseProfile(); } catch (e) { msg($('authMsg'), 'Something went wrong signing in. Please try again.', true); } })();
 $('toggleMode').onclick = () => {
   authMode = authMode === 'signin' ? 'signup' : 'signin';
   $('authTitle').textContent = authMode === 'signin' ? 'Welcome back!' : 'Create your parent account';
@@ -1891,23 +1868,7 @@ $('toggleMode').onclick = () => {
 };
 $('authForm').onsubmit = (e) => {
   e.preventDefault();
-  if (authMode === 'signup') {
-    const name = $('name').value.trim();
-    if (!name) return msg($('authMsg'), 'Please enter your name.', true);
-    me = { id: uid('p'), name, email: $('email').value.trim(), role: 'parent' };
-    DB.users.newParent = me;
-    msg($('authMsg'), '');
-    afterLogin();
-    return;
-  }
-  const email = $('email').value.trim().toLowerCase();
-  const pw = $('password').value;
-  if (!email) return msg($('authMsg'), 'Type your email address first.', true);
-  const role = Object.keys(DB.users).find((k) => DB.users[k].email === email);
-  // Prototype: a demo email signs in with its password, or with no password (same as the Google demo path)
-  if (!role || (pw !== '' && pw !== DB.users[role].password)) return msg($('authMsg'), "That email or password isn't right. For demo accounts, use password demo1234 or leave it blank.", true);
-  if ($('remember').checked) { /* prototype only: nothing is stored */ }
-  signInAs(role);
+  msg($('authMsg'), 'Please use Sign in with Google.', true);
 };
 // Sign In runs directly (not through a form submit), so it works even where forms are blocked
 $('authBtn').onclick = (e) => { e.preventDefault(); $('authForm').onsubmit({ preventDefault() {} }); };
@@ -1921,9 +1882,10 @@ $('pwToggle').onclick = () => {
   $('password').focus();
 };
 $('email').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('password').focus(); } });
-$('forgotBtn').onclick = () => msg($('authMsg'), 'Password reset comes with the live app. For now, use demo1234 with a demo account.');
+$('forgotBtn').onclick = () => msg($('authMsg'), 'Please sign in with Google. If you need help, email beaireadyco@gmail.com.');
 $('helpBtn').onclick = () => msg($('authMsg'), 'Email beaireadyco@gmail.com and we will help you get in.');
-function signOut() {
+async function signOut() {
+  if (sb) { try { await sb.auth.signOut(); } catch (e) {} }
   me = null;
   document.body.classList.remove('role-parent');
   document.body.classList.remove('role-teacher');
