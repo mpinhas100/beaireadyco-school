@@ -1853,9 +1853,17 @@ const sb = (window.supabase && window.supabase.createClient) ? window.supabase.c
 const isUuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const newId = () => crypto.randomUUID();
 function replaceAll(arr, items) { arr.splice(0, arr.length, ...items); }
-function clearStaffData() { replaceAll(DB.lessons, []); replaceAll(DB.quizzes, []); replaceAll(DB.groups, []); }
+let teacherList = [];
+function clearStaffData() { replaceAll(DB.lessons, []); replaceAll(DB.quizzes, []); replaceAll(DB.groups, []); replaceAll(teacherList, []); }
+async function loadTeachers() {
+  if (!sb) return;
+  const r = await sb.from('teachers').select('id,full_name,email').order('created_at');
+  if (r.error) throw new Error(r.error.message);
+  replaceAll(teacherList, r.data.map((t) => ({ id: t.id, name: t.full_name, email: t.email })));
+}
 async function loadStaffData() {
   if (!sb) return;
+  await loadTeachers();
   const [L, Q, QQ, G, GL] = await Promise.all([
     sb.from('lessons').select('id,title,teacher_notes,slides').order('created_at'),
     sb.from('quizzes').select('id,title,access_code,lesson_id').order('created_at'),
@@ -1927,7 +1935,11 @@ async function loadSupabaseProfile() {
   const { data } = await sb.auth.getSession();
   if (!data || !data.session) return;
   const user = data.session.user;
-  const { data: prof, error } = await sb.from('profiles').select('role, full_name').eq('id', user.id).maybeSingle();
+  let { data: prof, error } = await sb.from('profiles').select('role, full_name').eq('id', user.id).maybeSingle();
+  if (!prof && !error) {
+    await sb.rpc('claim_invite');
+    ({ data: prof, error } = await sb.from('profiles').select('role, full_name').eq('id', user.id).maybeSingle());
+  }
   if (error || !prof) {
     msg($('authMsg'), "Your account isn't set up yet. Please ask BeAIReadyCo to add you.", true);
     await sb.auth.signOut();
@@ -1935,6 +1947,10 @@ async function loadSupabaseProfile() {
   }
   const role = prof.role === 'admin' ? 'staff' : prof.role;
   me = { id: user.id, name: prof.full_name || user.email, email: user.email, role, dbRole: prof.role };
+  if (prof.role === 'teacher') {
+    const tr = await sb.from('teachers').select('id').eq('profile_id', user.id).maybeSingle();
+    me.teacherId = tr.data ? tr.data.id : null;
+  }
   if (['admin', 'staff', 'teacher'].includes(prof.role)) {
     try { await loadStaffData(); } catch (e) { msg($('authMsg'), `Could not load classes: ${e.message}`, true); }
   }
@@ -2710,14 +2726,16 @@ $('groupForm').onsubmit = (e) => {
   renderGroups();
   fillGroupTeacherSelect();
 };
-$('addTeacherForm').onsubmit = (e) => {
+$('addTeacherForm').onsubmit = async (e) => {
   e.preventDefault();
   const name = $('teacherName').value.trim();
-  const email = $('teacherEmail').value.trim();
+  const email = $('teacherEmail').value.trim().toLowerCase();
   if (findUserByEmail(email)) return msg($('groupsMsg'), 'That email already has an account.', true);
-  newLoginUser('teacher', name, email);
+  const r = await sb.from('teachers').insert({ full_name: name, email });
+  if (r.error) return msg($('groupsMsg'), r.error.code === '23505' ? 'That email is already a teacher.' : `Could not add the teacher: ${r.error.message}`, true);
   e.target.reset();
-  msg($('groupsMsg'), `${name} added as a teacher. They can now be assigned to classes and sign in.`);
+  await loadTeachers();
+  msg($('groupsMsg'), `${name} added as a teacher. They can sign in with Google to see their classes.`);
   renderGroups();
 };
 $('addFamilyForm').onsubmit = (e) => {
@@ -2754,8 +2772,8 @@ $('addStudentForm').onsubmit = (e) => {
   renderGroups();
 };
 const ADMIN_UI = { famOpen: new Set(), famEdit: null, stuEdit: null, teacherEdit: null };
-function allTeachers() { return Object.values(DB.users).filter((u) => u.role === 'teacher'); }
-function teacherNameOf(id) { const t = id && Object.values(DB.users).find((u) => u.id === id); return t ? t.name : 'No teacher yet'; }
+function allTeachers() { return teacherList; }
+function teacherNameOf(id) { const t = id && teacherList.find((u) => u.id === id); return t ? t.name : 'No teacher yet'; }
 function userKeyById(id) { return Object.keys(DB.users).find((k) => DB.users[k].id === id); }
 function findUserByEmail(email) { const e = (email || '').trim().toLowerCase(); return e ? Object.values(DB.users).find((u) => (u.email || '').toLowerCase() === e) : undefined; }
 function newLoginUser(role, name, email) {
@@ -2801,14 +2819,15 @@ function teacherRow(t) {
       mk('div', { cls: 'row-actions' },
         mk('button', { type: 'submit', text: 'Save teacher' }),
         mk('button', { type: 'button', cls: 'secondary', text: 'Cancel', on: () => { ADMIN_UI.teacherEdit = null; renderGroups(); } })));
-    form.onsubmit = (e) => {
+    form.onsubmit = async (e) => {
       e.preventDefault();
-      const addr = em.value.trim();
+      const addr = em.value.trim().toLowerCase();
       const clash = findUserByEmail(addr);
       if (clash && clash.id !== t.id) return msg($('groupsMsg'), 'Another account already uses that email.', true);
-      t.name = name.value.trim() || t.name;
-      t.email = addr;
+      const r = await sb.from('teachers').update({ full_name: name.value.trim() || t.name, email: addr }).eq('id', t.id);
+      if (r.error) return msg($('groupsMsg'), r.error.code === '23505' ? 'That email is already a teacher.' : `Could not save the teacher: ${r.error.message}`, true);
       ADMIN_UI.teacherEdit = null;
+      await loadTeachers();
       msg($('groupsMsg'), 'Teacher saved.');
       renderGroups();
     };
@@ -2819,10 +2838,11 @@ function teacherRow(t) {
     mk('div', { text: `${t.name} · ${t.email} · ${n} class${n === 1 ? '' : 'es'}` }),
     mk('div', { cls: 'row-actions' },
       mk('button', { type: 'button', cls: 'secondary', text: 'Edit', on: () => { ADMIN_UI.teacherEdit = t.id; renderGroups(); } }),
-      deleteButton('Remove', () => {
+      deleteButton('Remove', async () => {
+        const r = await sb.from('teachers').delete().eq('id', t.id);
+        if (r.error) return msg($('groupsMsg'), `Could not remove the teacher: ${r.error.message}`, true);
         DB.groups.forEach((g) => { if (g.teacherId === t.id) g.teacherId = null; });
-        persistStaff($('groupsMsg'));
-        delete DB.users[userKeyById(t.id)];
+        await loadTeachers();
         msg($('groupsMsg'), `${t.name} removed. Their classes now need a teacher.`);
         renderGroups();
       })));
@@ -4038,7 +4058,7 @@ function rowEl(o) {
   if (o.onclick) li.onclick = o.onclick;
   return li;
 }
-function myGroups() { return DB.groups.filter((g) => g.teacherId === me.id); }
+function myGroups() { return DB.groups.filter((g) => g.teacherId === (me.teacherId || me.id)); }
 function myGroupIds() { return myGroups().map((g) => g.id); }
 function isMyStudent(c) { return !!c && myGroupIds().includes(c.group_id); }
 function myStudents() { return DB.children.filter(isMyStudent); }
