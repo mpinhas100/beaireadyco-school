@@ -2029,6 +2029,7 @@ function showApprovalGate(user, status) {
   const btn = $('requestApprovalBtn');
   btn.disabled = false;
   if (status === 'pending') {
+    try { localStorage.setItem('bai_await_approval', user.id); } catch (e) {}
     $('gateText').textContent = 'Your request was sent. BeAIReadyCo will review it and approve your account. Please check back soon.';
     btn.classList.add('hidden');
   } else if (status === 'rejected') {
@@ -2078,6 +2079,12 @@ async function loadSupabaseProfile() {
   }
   const role = prof.role === 'admin' ? 'staff' : prof.role;
   me = { id: user.id, name: prof.full_name || user.email, email: user.email, role, dbRole: prof.role };
+  let waited = null;
+  try { waited = localStorage.getItem('bai_await_approval'); } catch (e) {}
+  if (waited === user.id) {
+    try { localStorage.removeItem('bai_await_approval'); } catch (e) {}
+    if (role === 'parent') (DB.notifications = DB.notifications || []).unshift({ id: newId(), text: 'Your account was approved. Welcome to BeAIReadyCo School!', read: false });
+  }
   if (prof.role === 'teacher') {
     const tr = await sb.from('teachers').select('id').eq('profile_id', user.id).maybeSingle();
     me.teacherId = tr.data ? tr.data.id : null;
