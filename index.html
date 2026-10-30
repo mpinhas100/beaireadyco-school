@@ -894,12 +894,6 @@ a.qa-tile{text-decoration:none;color:inherit}
       <button type="button" class="stat" id="goLessons"><span class="ic" data-ico="lessons"></span><span class="n" id="statLessons">0</span><span class="l">Lessons</span></button>
       <button type="button" class="stat" id="goGroups"><span class="ic" data-ico="groups"></span><span class="n" id="statGroups">0</span><span class="l">Groups</span></button>
     </div>
-    <div class="dash-grid">
-      <div class="card">
-        <h2>Recent activity</h2>
-        <ul class="activity" id="activityList"></ul>
-      </div>
-    </div>
   </section>
 
   <!-- Lessons (staff and teacher) -->
@@ -2089,36 +2083,6 @@ function renderDashboard() {
   $('statQuizzes').textContent = DB.quizzes.length;
   $('statLessons').textContent = DB.lessons.length;
   $('statGroups').textContent = DB.groups.length;
-  const ul = $('activityList');
-  ul.innerHTML = '';
-  const recent = [...DB.results].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 5);
-  if (!recent.length) return empty(ul, 'No quiz results yet.');
-  recent.forEach((r) => {
-    const c = DB.children.find((x) => x.id === r.childId);
-    const q = DB.quizzes.find((x) => x.id === r.quizId);
-    const li = document.createElement('li');
-    const left = document.createElement('div');
-    const strong = document.createElement('strong');
-    if (c) {
-      const nameBtn = document.createElement('button');
-      nameBtn.type = 'button';
-      nameBtn.className = 'name-link';
-      nameBtn.textContent = staffName(c);
-      nameBtn.onclick = () => openAdminStudent(c.id);
-      strong.append(nameBtn, ` finished "${q ? q.title : 'quiz'}"`);
-    } else {
-      strong.textContent = `Student finished "${q ? q.title : 'quiz'}"`;
-    }
-    const sub = document.createElement('span');
-    sub.className = 'muted';
-    sub.textContent = `Score ${r.score} of ${r.total}`;
-    left.append(strong, sub);
-    const when = document.createElement('span');
-    when.className = 'when';
-    when.textContent = new Date(r.at).toLocaleDateString();
-    li.append(left, when);
-    ul.appendChild(li);
-  });
 }
 const menuBtn = $('menuBtn');
 function setMenu(open) { document.body.classList.toggle('menu-open', open); menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
