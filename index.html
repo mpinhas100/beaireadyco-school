@@ -854,6 +854,12 @@ a.qa-tile{text-decoration:none;color:inherit}
         </div>
         <button type="button" class="link" id="toggleMode">Create an account instead</button>
       </form>
+      <div id="approvalGate" class="hidden" style="text-align:left">
+        <p class="muted" id="gateWho" style="margin:0 0 10px"></p>
+        <p id="gateText" style="margin:0 0 14px">Your account needs approval from BeAIReadyCo before you can log in.</p>
+        <button type="button" id="requestApprovalBtn">Send request for approval to log in</button>
+        <button type="button" class="link" id="gateSignOut">Use a different account</button>
+      </div>
       <p class="msg" id="authMsg" role="status"></p>
       <div class="login-foot"><button type="button" class="link" id="helpBtn">Need help?</button></div>
     </div>
@@ -2011,6 +2017,42 @@ async function saveStaffData() {
 function persistStaff(el) {
   saveStaffData().then((err) => { if (err && el) msg(el, `Could not save to the database: ${err}`, true); });
 }
+let gateOldTitle = null;
+function showApprovalGate(user, status) {
+  const email = user.email || '';
+  if (gateOldTitle === null) gateOldTitle = $('authTitle').textContent;
+  $('authTitle').textContent = 'Almost there';
+  $('authForm').classList.add('hidden');
+  $('approvalGate').classList.remove('hidden');
+  msg($('authMsg'), '');
+  $('gateWho').textContent = `Signed in as ${email}`;
+  const btn = $('requestApprovalBtn');
+  btn.disabled = false;
+  if (status === 'pending') {
+    $('gateText').textContent = 'Your request was sent. BeAIReadyCo will review it and approve your account. Please check back soon.';
+    btn.classList.add('hidden');
+  } else if (status === 'rejected') {
+    $('gateText').textContent = "This account wasn't approved. Please contact BeAIReadyCo at beaireadyco@gmail.com.";
+    btn.classList.add('hidden');
+  } else {
+    $('gateText').textContent = 'Your account needs approval from BeAIReadyCo before you can log in. Send your request below.';
+    btn.classList.remove('hidden');
+  }
+}
+function hideApprovalGate() {
+  $('approvalGate').classList.add('hidden');
+  $('authForm').classList.remove('hidden');
+  if (gateOldTitle !== null) { $('authTitle').textContent = gateOldTitle; gateOldTitle = null; }
+}
+$('requestApprovalBtn').onclick = async () => {
+  const btn = $('requestApprovalBtn');
+  btn.disabled = true;
+  const r = await sb.rpc('request_access');
+  if (r.error) { btn.disabled = false; return msg($('authMsg'), `Could not send the request: ${r.error.message}`, true); }
+  const { data } = await sb.auth.getSession();
+  showApprovalGate(data.session.user, 'pending');
+};
+$('gateSignOut').onclick = () => signOut();
 async function loadSupabaseProfile() {
   if (!sb) return;
   const { data } = await sb.auth.getSession();
@@ -2029,16 +2071,9 @@ async function loadSupabaseProfile() {
     ({ data: prof, error } = await sb.from('profiles').select('role, full_name').eq('id', user.id).maybeSingle());
   }
   if (error || !prof) {
-    let status = 'pending';
-    if (!error) {
-      await sb.rpc('request_access');
-      const st = await sb.from('access_requests').select('status').eq('user_id', user.id).maybeSingle();
-      status = st.data ? st.data.status : 'pending';
-    }
-    msg($('authMsg'), status === 'rejected'
-      ? "This account wasn't approved. Please contact BeAIReadyCo."
-      : 'Thanks! Your request is waiting for approval. BeAIReadyCo will set up your account.', status === 'rejected');
-    await sb.auth.signOut();
+    if (error) return msg($('authMsg'), 'Something went wrong signing in. Please try again.', true);
+    const st = await sb.from('access_requests').select('status').eq('user_id', user.id).maybeSingle();
+    showApprovalGate(user, st.data ? st.data.status : null);
     return;
   }
   const role = prof.role === 'admin' ? 'staff' : prof.role;
@@ -2097,6 +2132,7 @@ function signOut() {
   stopAdminBell();
   previewReturn = null;
   $('googlePick').classList.add('hidden');
+  hideApprovalGate();
   $('authForm').reset();
   show('auth');
   if (sb) sb.auth.signOut({ scope: 'local' }).catch(() => {});
