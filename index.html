@@ -2005,8 +2005,8 @@ $('pwToggle').onclick = () => {
 $('email').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('password').focus(); } });
 $('forgotBtn').onclick = () => msg($('authMsg'), 'Please sign in with Google. If you need help, email beaireadyco@gmail.com.');
 $('helpBtn').onclick = () => msg($('authMsg'), 'Email beaireadyco@gmail.com and we will help you get in.');
-async function signOut() {
-  if (sb) { try { await sb.auth.signOut(); } catch (e) {} }
+function signOut() {
+  // Change the screen first, then end the session on this device only, so a slow network can't block it.
   clearStaffData();
   me = null;
   document.body.classList.remove('role-parent');
@@ -2016,6 +2016,7 @@ async function signOut() {
   $('googlePick').classList.add('hidden');
   $('authForm').reset();
   show('auth');
+  if (sb) sb.auth.signOut({ scope: 'local' }).catch(() => {});
 }
 ['homeSignOut', 'topSignOut'].forEach((id) => { $(id).onclick = signOut; });
 
