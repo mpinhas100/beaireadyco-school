@@ -2028,6 +2028,7 @@ function showApprovalGate(user, status) {
   $('gateWho').textContent = `Signed in as ${email}`;
   const btn = $('requestApprovalBtn');
   btn.disabled = false;
+  startGateWatch();
   if (status === 'pending') {
     try { localStorage.setItem('bai_await_approval', user.id); } catch (e) {}
     $('gateText').textContent = 'Your request was sent. BeAIReadyCo will review it and approve your account. Please check back soon.';
@@ -2040,7 +2041,21 @@ function showApprovalGate(user, status) {
     btn.classList.remove('hidden');
   }
 }
+let gateTimer = null;
+let gateChecking = false;
+async function gateRecheck() {
+  if ($('approvalGate').classList.contains('hidden') || gateChecking || me) return;
+  gateChecking = true;
+  try { await loadSupabaseProfile(); } catch (e) {} finally { gateChecking = false; }
+}
+function startGateWatch() {
+  if (gateTimer) return;
+  gateTimer = setInterval(gateRecheck, 20000);
+}
+function stopGateWatch() { if (gateTimer) { clearInterval(gateTimer); gateTimer = null; } }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) gateRecheck(); });
 function hideApprovalGate() {
+  stopGateWatch();
   $('approvalGate').classList.add('hidden');
   $('authForm').classList.remove('hidden');
   if (gateOldTitle !== null) { $('authTitle').textContent = gateOldTitle; gateOldTitle = null; }
@@ -2077,6 +2092,7 @@ async function loadSupabaseProfile() {
     showApprovalGate(user, st.data ? st.data.status : null);
     return;
   }
+  hideApprovalGate();
   const role = prof.role === 'admin' ? 'staff' : prof.role;
   me = { id: user.id, name: prof.full_name || user.email, email: user.email, role, dbRole: prof.role };
   let waited = null;
