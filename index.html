@@ -1107,15 +1107,10 @@ a.qa-tile{text-decoration:none;color:inherit}
   </section>
 
   <!-- Students (admin) -->
-  <section id="students" class="hidden students-page">
-    <header class="stu-head">
-      <div>
-        <h1>Students</h1>
-        <p class="muted stu-sub">Families, their children, and each child's class.</p>
-      </div>
-    </header>
+  <section id="students" class="hidden">
+    <h1>Students</h1>
     <div class="card hidden" id="stuDetail" style="margin-bottom:14px"></div>
-    <div class="gact-row stu-actions" role="group" aria-label="Family and student actions">
+    <div class="gact-row" role="group" aria-label="Family and student actions">
       <button type="button" class="secondary" data-gact-btn="addfamily" aria-pressed="false">+ Add family</button>
       <button type="button" class="secondary" data-gact-btn="addstudent" aria-pressed="false">+ Add student</button>
     </div>
@@ -1149,55 +1144,19 @@ a.qa-tile{text-decoration:none;color:inherit}
       </form>
     </div>
 
-    <div class="stu-grid">
-    <div class="card stu-panel">
-      <h3 class="stu-h">Families and students</h3>
+    <div class="card" data-panel="students">
+      <h2>Families and students</h2>
       <div id="familyList"></div>
     </div>
-    <div class="card stu-panel">
-      <h3 class="stu-h">All students</h3>
+    <div class="card">
+      <h2>All students</h2>
       <label for="stuSearch">Search by student ID, name, group, school, or section</label>
       <input id="stuSearch" maxlength="80" autocomplete="off">
       <ul class="list" id="stuList"></ul>
-      <p class="muted stu-note">Students appear by first name and last initial only.</p>
-    </div>
+      <p class="muted" style="font-size:13px;margin:12px 0 0">Students appear by first name and last initial only.</p>
     </div>
   </section>
 
-<style id="students-ui">
-#students.students-page{max-width:1100px;margin:0 auto}
-.stu-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:4px 0 14px}
-.stu-head h1{margin:0}
-.stu-sub{margin:4px 0 0;font-size:14px}
-.stu-actions{grid-template-columns:repeat(auto-fit,minmax(160px,max-content));justify-content:start;margin:0 0 14px}
-.stu-actions button{margin:0;padding:10px 16px;border-radius:10px;font-weight:600}
-.stu-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}
-.stu-panel{margin:0;padding:18px}
-.stu-h{margin:0 0 12px;font-size:15px;letter-spacing:.01em}
-.stu-note{font-size:12px;margin:12px 0 0}
-#students .fam{border-radius:12px;padding:0;margin-bottom:10px;overflow:hidden;background:#fff}
-#students .fam summary{padding:12px 14px;display:flex;align-items:center;gap:8px;list-style:none;font-size:15px}
-#students .fam summary::-webkit-details-marker{display:none}
-#students .fam summary::before{content:"";width:0;height:0;border-left:6px solid #64748b;border-top:5px solid transparent;border-bottom:5px solid transparent;transition:transform .15s}
-#students .fam[open] summary::before{transform:rotate(90deg)}
-#students .fam summary .muted{font-size:13px}
-#students .fam-body,#students .fam > p,#students .fam > .list,#students .fam > .muted{padding:0 14px}
-#students .fam-body{padding:0 14px 12px}
-#students .fam > ul.list{padding:0 8px 8px}
-#students .fam > p.muted{padding-bottom:10px}
-#students .row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-#students .row-actions button{margin:0;padding:8px 12px;font-size:13px}
-#stuSearch{margin-top:6px}
-#stuList{list-style:none;padding:0;margin:12px 0 0}
-#stuList li{padding:10px 4px;border-top:1px solid #eef0f5;margin:0}
-#stuList li:first-child{border-top:0}
-#stuList li > div:first-child{display:flex;align-items:center;gap:12px;min-width:0}
-#stuList li > div:first-child > div:last-child{min-width:0}
-#stuList li strong{display:block;font-size:15px}
-#stuList li .muted{font-size:13px}
-#stuList .stu-avatar{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#e8efff;color:#1e40af;font-weight:700;font-size:13px}
-@media (max-width:820px){.stu-grid{grid-template-columns:1fr}}
-</style>
   <!-- Settings (admin) -->
   <section id="settings" class="hidden">
     <h1>Settings</h1>
@@ -2427,13 +2386,7 @@ function drawStudents(q) {
     sub.className = 'muted';
     sub.textContent = g ? g.name : 'No group yet';
     left.append(strong, sub);
-    const av = document.createElement('div');
-    av.className = 'stu-avatar';
-    av.setAttribute('aria-hidden', 'true');
-    av.textContent = (staffName(c) || '?').charAt(0).toUpperCase();
-    const wrap = document.createElement('div');
-    wrap.append(av, left);
-    li.append(wrap, pill(c.student_id));
+    li.append(left, pill(c.student_id));
     ul.appendChild(li);
   });
 }
