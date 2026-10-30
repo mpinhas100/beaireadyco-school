@@ -1961,6 +1961,13 @@ async function loadSupabaseProfile() {
   const { data } = await sb.auth.getSession();
   if (!data || !data.session) return;
   const user = data.session.user;
+  // Record parent consent that was checked before the Google redirect (notice version 2026-10-30).
+  let pendingConsent = null;
+  try { pendingConsent = localStorage.getItem('bai_consent_version'); } catch (e) {}
+  if (pendingConsent) {
+    const rec = await sb.rpc('record_consent', { p_version: pendingConsent });
+    if (!rec.error) { try { localStorage.removeItem('bai_consent_version'); } catch (e) {} }
+  }
   let { data: prof, error } = await sb.from('profiles').select('role, full_name').eq('id', user.id).maybeSingle();
   if (!prof && !error) {
     await sb.rpc('claim_invite');
@@ -1992,6 +1999,7 @@ async function loadSupabaseProfile() {
 }
 $('googleBtn').onclick = async () => {
   if (!$('consentCb').checked) return msg($('authMsg'), 'Please read the privacy notice and check the consent box before you continue.', true);
+  try { localStorage.setItem('bai_consent_version', '2026-10-30'); } catch (e) {}
   if (!sb) return msg($('authMsg'), 'Sign-in is not available right now. Please try again later.', true);
   const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href.split('#')[0], queryParams: { prompt: 'select_account' } } });
   if (error) msg($('authMsg'), error.message, true);
