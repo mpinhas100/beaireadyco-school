@@ -420,6 +420,18 @@ main.anon #auth .login-tag{color:#fff;font-size:15px;letter-spacing:.42em;font-w
   main.anon #auth .login-card-box .login-foot{margin:12px 0 0}
   main.anon #auth .login-card-box .msg:empty{display:none}
 }
+/* Phones: keep the consent block compact so the card does not cover the picture */
+@media (max-width:600px){
+  main.anon #auth .consent-box{font-size:11.5px!important;line-height:1.3;margin:4px 0 8px!important}
+  main.anon #auth .consent-box summary{font-size:11.5px;margin-top:2px}
+  main.anon #auth .consent-box .choice{gap:8px;margin:0}
+  main.anon #auth .consent-box details[open] > div{max-height:26svh;overflow-y:auto}
+  main.anon #auth .login-card-box{padding:16px 18px!important}
+  main.anon #auth .login-card-box form{gap:10px!important}
+  main.anon #auth .login-card-box input:not([type=checkbox]){height:44px!important}
+  main.anon #authBtn{height:48px!important}
+  main.anon #auth .login-card-box .login-row{margin:0!important}
+}
 /* Scale logo and characters with screen height so nothing is cut off on phones */
 @media (max-width:600px){
   main.anon #auth .login-logo-wrap{width:clamp(72px,13svh,110px);height:clamp(72px,13svh,110px)}
