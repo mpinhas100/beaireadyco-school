@@ -593,14 +593,20 @@ main.anon #auth .top-brand .form-ai{color:transparent;text-shadow:none;backgroun
 /* AI SCHOOL shimmers */
 main.anon #auth .top-brand .form-ai{background:linear-gradient(90deg,#ffffff 0%,#8fd3ff 22%,#ffffff 45%,#e3b8ff 70%,#ffffff 100%)!important;background-size:250% 100%!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent!important;color:transparent!important;animation:aiShimmer 3s linear infinite!important;text-shadow:none!important;filter:drop-shadow(0 2px 6px rgba(5,10,50,.65))}
 @media (prefers-reduced-motion:reduce){main.anon #auth .top-brand .form-ai{animation:none!important;background-position:50% 50%!important}}
-/* Phone: email sign-in folds away so the whole picture, signs included, shows */
-.or-divider{cursor:pointer;user-select:none}
+/* Phone: tighter form (labels become placeholders) so the picture and both signs show */
+.or-divider{cursor:default}
 @media (max-width:600px){
-  main.anon #auth:not(.email-open) #authForm > :not(#googleBtn):not(#googlePick):not(#orDivider){display:none!important}
-  main.anon #auth .or-divider span::after{content:" \25BE";}
-  main.anon #auth.email-open .or-divider span::after{content:" \25B4";}
-  main.anon #auth .or-divider{margin:12px 0 2px;padding:6px 0;font-size:13px}
-  main.anon #auth .login-card-box{padding-top:14px!important;padding-bottom:12px!important}
+  main.anon #auth .login-card-box form > label[for=email],main.anon #auth .login-card-box form > label[for=password]{display:none!important}
+  main.anon #auth .login-card-box{padding-top:12px!important;padding-bottom:10px!important}
+  main.anon #auth .or-divider{margin:7px 0 7px}
+  main.anon #auth .or-divider span{display:none}
+  main.anon #auth.login-page::before{background-position:center calc(-50px + 35%)!important;background-color:#0f1a5c}
+  main.anon #auth .login-card-box input:not([type=checkbox]){height:40px!important;margin:0 0 7px!important}
+  main.anon #auth .login-card-box .pw-wrap{margin:0 0 2px}
+  main.anon #auth .login-card-box .pw-wrap input{margin:0!important}
+  main.anon #auth #googleBtn{height:40px!important}
+  main.anon #authBtn{height:42px!important;margin-top:6px!important}
+  main.anon #auth #toggleMode{margin-top:0;padding:4px 0 0;font-size:13px}
 }
 
 @media (prefers-reduced-motion:reduce){main.anon #auth .form-ai{animation:none}}
@@ -897,10 +903,10 @@ a.qa-tile{text-decoration:none;color:inherit}
           <input id="name" autocomplete="name">
         </div>
         <label for="email">Email</label>
-        <input id="email" type="email" autocomplete="email" placeholder="admin@beaireadyco.com" required>
+        <input id="email" aria-label="Email" type="email" autocomplete="email" placeholder="admin@beaireadyco.com" required>
         <label for="password">Password</label>
         <div class="pw-wrap">
-          <input id="password" type="password" autocomplete="current-password" placeholder="Enter your password">
+          <input id="password" aria-label="Password" type="password" autocomplete="current-password" placeholder="Enter your password">
           <button type="button" class="pw-toggle" id="pwToggle" aria-label="Show password" aria-pressed="false">Show</button>
         </div>
         <div class="login-row">
@@ -2143,8 +2149,6 @@ $('consentSubmit').onclick = async () => {
   try { await loadSupabaseProfile(); } catch (e) { msg($('authMsg'), 'Something went wrong signing in. Please try again.', true); }
 };
 $('consentSignOut').onclick = () => signOut();
-$('orDivider').onclick = () => { const o = $('auth').classList.toggle('email-open'); $('orDivider').setAttribute('aria-expanded', o ? 'true' : 'false'); };
-$('orDivider').setAttribute('role', 'button'); $('orDivider').setAttribute('aria-expanded', 'false');
 let gateTimer = null;
 let gateChecking = false;
 async function gateRecheck() {
