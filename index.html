@@ -199,6 +199,10 @@ main.anon .who,main.anon #topSignOut{display:none!important}
 .promo{margin-top:auto;padding:16px;border-radius:18px;background:rgba(255,255,255,.08);text-align:center}
 .promo img{display:block;width:110px;height:110px;object-fit:contain;margin:0 auto}
 .promo p{margin:8px 0 0;font-weight:800;font-size:15px;line-height:1.25;color:#fff}
+main>section:not(#auth){grid-area:body;min-width:0;margin:0;padding:26px 28px 48px}
+@media (max-width:720px){main>section:not(#auth){padding:18px 16px 32px}}
+.back-home{display:inline-flex;align-items:center;gap:6px;background:#eef3ff;color:#1d3fa8;border:0;border-radius:12px;padding:8px 14px 8px 10px;font:inherit;font-size:15px;font-weight:600;cursor:pointer;margin:0 0 14px;width:auto}
+.back-home svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 #auth,#welcome,#lessons,#viewer,#quizzes,#home,#child,#students,#settings{grid-area:body;min-width:0;margin:0;padding:26px 28px 48px}
 section>h1{font-size:28px;font-weight:800;letter-spacing:-.01em;margin:0 0 16px;color:var(--ink)}
 .card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px;margin:0 0 18px;box-shadow:0 1px 2px rgba(20,30,70,.04),0 10px 26px rgba(20,30,70,.05)}
@@ -1935,10 +1939,57 @@ function goto(key) {
   refreshMenu();
 }
 
+// ---- Back navigation: a "Back to Home" button on every inner page, and a left-edge swipe to go back ----
+const HOME_VIEWS = new Set(['auth', 'home', 'welcome', 'tHome', 'child']);
+let viewStack = [];
+let currentView = null;
+let goingBack = false;
+function trackView(view) {
+  if (HOME_VIEWS.has(view)) viewStack = [];
+  else if (currentView && currentView !== view && !goingBack) { viewStack.push(currentView); if (viewStack.length > 20) viewStack.shift(); }
+  currentView = view;
+  goingBack = false;
+  if (HOME_VIEWS.has(view)) return;
+  const sec = $(view);
+  if (!sec || sec.querySelector(':scope > .back-home')) return;
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'back-home';
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>Back to Home';
+  b.onclick = goHome;
+  sec.insertBefore(b, sec.firstChild);
+}
+function goHome() {
+  const first = menuFor()[0];
+  if (first) goto(first.key);
+}
+function goBack() {
+  if (!currentView || HOME_VIEWS.has(currentView)) return;
+  const prev = viewStack.pop();
+  const item = prev && menuFor().find((i) => i.section === prev);
+  if (!item || HOME_VIEWS.has(prev)) return goHome();
+  goingBack = true;
+  goto(item.key);
+}
+(() => {
+  let sx = null, sy = 0, st = 0;
+  document.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    sx = t.clientX <= 30 ? t.clientX : null; sy = t.clientY; st = Date.now();
+  }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    if (sx === null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = Math.abs(t.clientY - sy);
+    sx = null;
+    if (dx > 70 && dy < 60 && Date.now() - st < 800) goBack();
+  }, { passive: true });
+})();
 function show(view) {
   ['auth', 'adminCal', 'welcome', 'lessons', 'viewer', 'quizzes', 'home', 'child', 'students', 'settings', 'kids', 'classes', 'pProjects', 'pProgress', 'pCalendar', 'pMessages', 'pResources', 'pSettings', 'pProfile', 'tHome', 'tClasses', 'tStudents', 'tResources', 'tCalendar', 'tMessages', 'tActivity', 'tSettings', 'tProfile', 'inbox'].forEach((v) => $(v).classList.toggle('hidden', v !== view));
   document.querySelector('main').classList.toggle('anon', view === 'auth');
   $('topSignOut').classList.toggle('hidden', view === 'auth');
+  trackView(view);
   window.scrollTo(0, 0);
   if (view === 'auth') $('menu').classList.add('hidden');
   else refreshMenu();
