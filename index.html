@@ -2258,6 +2258,26 @@ $('requestApprovalBtn').onclick = async () => {
   showApprovalGate(data.session.user, 'pending');
 };
 $('gateSignOut').onclick = () => signOut();
+// Real accounts never see the prototype's made-up people, notifications or messages.
+function clearSampleData() {
+  DB.users = {};
+  DB.children = [];
+  DB.families = [];
+  DB.parentNames = {};
+  DB.groups = [];
+  DB.classes = [];
+  DB.quizAssignments = [];
+  DB.lessonAssignments = [];
+  DB.lessonProgress = [];
+  DB.notifications = [];
+  DB.messages = [];
+  DB.projects = [];
+  DB.results = [];
+  DB.access = [];
+  DB.payments = [];
+  DB.familyPasses = [];
+  DB.memberships = [];
+}
 async function loadSupabaseProfile() {
   if (!sb) return;
   const { data } = await sb.auth.getSession();
@@ -2279,6 +2299,7 @@ async function loadSupabaseProfile() {
     return;
   }
   hideApprovalGate();
+  clearSampleData();
   const role = prof.role === 'admin' ? 'staff' : prof.role;
   me = { id: user.id, name: prof.full_name || user.email, email: user.email, role, dbRole: prof.role };
   let waited = null;
