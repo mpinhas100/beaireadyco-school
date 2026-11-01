@@ -682,6 +682,13 @@ main.anon #auth .top-brand .form-ai{background:linear-gradient(90deg,#ffffff 0%,
 .p-prof-menu button{background:transparent;color:#1e293b;text-align:left;border:0;border-radius:10px;padding:10px 12px;font:inherit;font-size:15px;cursor:pointer;margin:0;width:100%}
 .p-prof-menu button:hover{background:#f1f5f9}
 .push-box{margin-top:18px;padding-top:14px;border-top:1px solid #e5e7eb}.push-box h3{margin:0 0 4px;font-size:16px}.push-box button{margin-top:8px}
+.msg-widget{background:#fff;border:1px solid #e5e9f5;border-radius:20px;padding:16px 18px;margin:16px 0;box-shadow:0 4px 18px rgba(15,23,42,.04)}
+.msg-widget-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.msg-widget-head h2{margin:0;font-size:18px;display:flex;align-items:center;gap:8px}
+.msg-badge{background:#2563eb;color:#fff;border-radius:999px;font-size:12px;font-weight:700;padding:2px 8px}
+.msg-widget-actions{display:flex;gap:8px}
+.msg-widget-actions button{width:auto;margin:0;padding:8px 14px;font-size:14px}
+.msg-widget .msg-item{border-radius:14px;padding:10px 12px}
 .msgapp{max-width:760px}
 .msg-top{display:flex;gap:10px;align-items:center;margin:0 0 12px;flex-wrap:wrap}
 .msg-top input{flex:1;min-width:180px;margin:0}
@@ -2228,7 +2235,7 @@ async function loadTeacherChildren() {
   if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
 }
 // ---- Auto-update: if a newer version of the app is published, reload into it (no need to close the app) ----
-const APP_BUILD = '20261101235231';
+const APP_BUILD = '20261101235806';
 async function checkForUpdate() {
   try {
     const r = await fetch('/version.txt?t=' + Date.now(), { cache: 'no-store' });
@@ -5389,6 +5396,62 @@ MSG_SECTIONS.forEach((sec) => { P_RENDER[sec] = () => renderMsgApp(sec); });
     if (it) goto(it.key);
   };
   setTimeout(tryOpen, 800);
+})();
+
+/* ---------- Messages card on every dashboard ---------- */
+const MSG_HOMES = ['home', 'welcome', 'tHome'];
+function msgThreads() {
+  const threads = new Map();
+  MSG.messages.forEach((m) => { const p = msgPeerOf(m); const t = threads.get(p) || { peer: p, last: null, unread: 0 }; t.last = m; if (m.recipient_id === me.id && !m.read_at) t.unread += 1; threads.set(p, t); });
+  return [...threads.values()].sort((a, b) => (a.last.created_at < b.last.created_at ? 1 : -1));
+}
+function msgSectionKey() { const it = menuFor().find((i) => MSG_SECTIONS.includes(i.section)); return it ? it.key : null; }
+function openMessages(view, peer, child) {
+  const key = msgSectionKey(); if (!key) return;
+  MSG.view = view || 'list'; MSG.peer = peer || null; MSG.child = child || null; MSG.q = '';
+  goto(key);
+  if (peer) { const it = menuFor().find((i) => i.key === key); const box = it && $(it.section).querySelector('.msgapp'); if (box) openMsgThread(peer, child, box); }
+}
+function drawMsgWidget(secId) {
+  const sec = $(secId); if (!sec || !me || !msgSectionKey()) return;
+  let w = sec.querySelector(':scope > .msg-widget');
+  if (!w) {
+    w = mk('div', { cls: 'msg-widget' });
+    const anchor = sec.querySelector(':scope > .p-hero, :scope > .hero, :scope > h1');
+    if (anchor && anchor.nextSibling) sec.insertBefore(w, anchor.nextSibling); else sec.insertBefore(w, sec.firstChild);
+  }
+  w.innerHTML = '';
+  const threads = msgThreads();
+  const unread = threads.reduce((n, t) => n + t.unread, 0);
+  w.append(mk('div', { cls: 'msg-widget-head' },
+    mk('h2', null, 'Messages', unread ? mk('span', { cls: 'msg-badge', text: `${unread} new` }) : ''),
+    mk('div', { cls: 'msg-widget-actions' },
+      mk('button', { type: 'button', text: '+ New message', on: () => openMessages('new') }),
+      mk('button', { type: 'button', cls: 'secondary', text: 'View all', on: () => openMessages('list') }))));
+  const ul = mk('ul', { cls: 'msg-list' });
+  if (!MSG.loaded && !threads.length) ul.appendChild(mk('li', { cls: 'muted', text: 'Loading messages…' }));
+  else if (!threads.length) ul.appendChild(mk('li', { cls: 'muted', text: 'No messages yet.' }));
+  threads.slice(0, 3).forEach((t) => {
+    const name = msgName(t.peer);
+    ul.appendChild(mk('li', null, mk('button', { type: 'button', cls: 'msg-item', on: () => openMessages('thread', t.peer, t.last.child_id || null) },
+      mk('span', { cls: 'msg-av', text: initials(name) }),
+      mk('span', { cls: 'msg-main' },
+        mk('span', { cls: 'msg-name' }, mk('span', null, name, t.unread ? mk('span', { cls: 'msg-dot', 'aria-label': 'Unread' }) : ''), mk('small', { text: msgTime(t.last.created_at) })),
+        mk('span', { cls: 'msg-sub', text: `${t.last.sender_id === me.id ? 'You: ' : ''}${t.last.body}` })))));
+  });
+  w.appendChild(ul);
+}
+function renderMsgWidget(secId) {
+  drawMsgWidget(secId);
+  loadMsgData().then(() => { if (currentView === secId) drawMsgWidget(secId); });
+}
+(() => {
+  const orig = goto;
+  goto = function (key) {
+    const r = orig.apply(this, arguments);
+    if (MSG_HOMES.includes(currentView)) renderMsgWidget(currentView);
+    return r;
+  };
 })();
 </script>
 </body>
