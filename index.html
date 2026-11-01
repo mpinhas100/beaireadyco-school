@@ -1319,7 +1319,7 @@ a.qa-tile{text-decoration:none;color:inherit}
     <h1>My children</h1>
     <div class="card">
       <h2>Your children</h2>
-      <ul class="list" id="kids"></ul>
+      <ul class="list" id="kidsList"></ul>
     </div>
     <div class="card">
       <h2>Add a child</h2>
@@ -2102,6 +2102,40 @@ const SUPA_KEY = 'sb_publishable_TNPX4iBAwaAuU8ukeaKJgg_5WQb-Iun';
 const sb = (window.supabase && window.supabase.createClient) ? window.supabase.createClient(SUPA_URL, SUPA_KEY) : null;
 // Looks up the signed-in person's profile. Admins use the staff views in this build.
 /* ---------- Staff data in Supabase (Phase 1: lessons, quizzes, classes) ---------- */
+// Children are saved in the database so admin and parent see the same list.
+const newUuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => { const r = (Math.random() * 16) | 0; return (ch === 'x' ? r : (r & 3) | 8).toString(16); }));
+async function saveChild(c) {
+  if (!sb || !me || !isUuid(c.id) || !isUuid(c.parent_id)) return 'not-saved';
+  // Real names are stored only when the parent has agreed (the parent adding the child,
+  // or a parent who accepted the privacy notice). Otherwise only the nickname is stored.
+  let consent = c.parent_id === me.id;
+  if (!consent && (c.first_name || c.last_name)) {
+    const pc = await sb.from('parent_consents').select('id').eq('user_id', c.parent_id).limit(1);
+    consent = !pc.error && pc.data && pc.data.length > 0;
+  }
+  const row = {
+    id: c.id, parent_id: c.parent_id, nickname: (c.nickname || c.first_name || 'Student').slice(0, 30),
+    student_id: c.student_id || null, group_id: isUuid(c.group_id) ? c.group_id : null,
+    first_name: consent ? (c.first_name || null) : null, last_name: consent ? (c.last_name || null) : null,
+  };
+  if (consent && row.first_name) row.name_consent_at = new Date().toISOString();
+  const r = await sb.from('children').upsert(row);
+  return r.error ? r.error.message : null;
+}
+async function deleteChild(id) {
+  if (!sb || !isUuid(id)) return null;
+  const r = await sb.from('children').delete().eq('id', id);
+  return r.error ? r.error.message : null;
+}
+const mapChildRow = (c) => ({
+  id: c.id, nickname: c.nickname || c.first_name || '', first_name: c.first_name || '', last_name: c.last_name || '',
+  student_id: c.student_id || '', family_id: c.parent_id, parent_id: c.parent_id, group_id: c.group_id || null,
+});
+async function loadMyChildren() {
+  if (!sb || !me) return;
+  const r = await sb.from('children').select('id,parent_id,nickname,first_name,last_name,student_id,group_id').eq('parent_id', me.id).order('created_at');
+  if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
+}
 const isUuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const newId = () => crypto.randomUUID();
 function replaceAll(arr, items) { arr.splice(0, arr.length, ...items); }
@@ -2155,10 +2189,7 @@ async function loadFamilies() {
     const name = p.full_name || r.full_name || r.email || 'Parent';
     return { id: p.id, name: `${name} family`, parentName: name, parentEmail: r.email || '', parentId: p.id };
   }));
-  replaceAll(DB.children, ((C && !C.error && C.data) || []).map((c) => ({
-    id: c.id, nickname: c.nickname || c.first_name || '', first_name: c.first_name || '', last_name: c.last_name || '',
-    student_id: c.student_id || '', family_id: c.parent_id, parent_id: c.parent_id, group_id: c.group_id || null,
-  })));
+  replaceAll(DB.children, ((C && !C.error && C.data) || []).map(mapChildRow));
 }
 // Saves lessons, quizzes and classes. Returns an error message, or null on success.
 async function saveStaffData() {
@@ -2332,6 +2363,7 @@ async function loadSupabaseProfile() {
     const tr = await sb.from('teachers').select('id').eq('profile_id', user.id).maybeSingle();
     me.teacherId = tr.data ? tr.data.id : null;
   }
+  if (prof.role === 'parent') { try { await loadMyChildren(); } catch (e) {} }
   if (['admin', 'staff', 'teacher'].includes(prof.role)) {
     try { await loadStaffData(); } catch (e) { msg($('authMsg'), `Could not load classes: ${e.message}`, true); }
   }
@@ -3117,8 +3149,12 @@ $('addStudentForm').onsubmit = (e) => {
   const consent = $('studentConsent').checked;
   if (email && !consent) return msg($('studentsMsg'), 'A parent or guardian must agree before a child gets a sign-in.', true);
   if (email && findUserByEmail(email)) return msg($('studentsMsg'), 'That email already has a sign-in. Use a different email.', true);
-  const c = { id: uid('c'), nickname: first, first_name: first, last_name: last, student_id: newStudentId(), parent_id: fam.parentId, family_id: fam.id, group_id: $('addStudentGroup').value || null, email, dob, grade };
+  const c = { id: newUuid(), nickname: first, first_name: first, last_name: last, student_id: newStudentId(), parent_id: fam.parentId, family_id: fam.id, group_id: $('addStudentGroup').value || null, email, dob, grade };
   DB.children.push(c);
+  saveChild(c).then((err) => {
+    if (err === 'not-saved') msg($('studentsMsg'), `${first} was added for now, but this family has no approved parent account, so it will not be saved.`, true);
+    else if (err) msg($('studentsMsg'), `Could not save ${first}: ${err}`, true);
+  });
   if (email) {
     DB.users[`child_${c.id}`] = { id: uid('k'), name: [first, last].filter(Boolean).join(' '), email, password: 'demo1234', role: 'child', childId: c.id };
   }
@@ -3255,6 +3291,7 @@ function studentEditForm(c) {
     c.group_id = cls.value || null;
     ADMIN_UI.stuEdit = null;
     msg($('studentsMsg'), 'Student saved.');
+    saveChild(c).then((err) => { if (err && err !== 'not-saved') msg($('studentsMsg'), `Could not save: ${err}`, true); });
     renderGroups();
   };
   return mk('li', null, form);
@@ -3273,6 +3310,7 @@ function studentRow(c) {
       deleteButton('Remove', () => {
         DB.children = DB.children.filter((x) => x.id !== c.id);
         msg($('studentsMsg'), `${name} removed.`);
+        deleteChild(c.id).then((err) => { if (err) msg($('studentsMsg'), `Could not remove ${name}: ${err}`, true); });
         renderGroups();
       })));
 }
@@ -3612,15 +3650,18 @@ $('kidForm').onsubmit = (e) => {
   if (code && !group) return msg($('kidMsg'), 'That invite code was not found. Check it and try again.', true);
   DB.parentNames[me.id] = { first: $('pFirst').value.trim(), last: $('pLast').value.trim() };
   const student_id = newStudentId();
-  DB.children.push({
-    id: uid('c'),
+  const child = {
+    id: newUuid(),
     nickname: $('nick').value.trim(),
     first_name: $('cFirst').value.trim(),
     last_name: $('cLast').value.trim(),
     student_id,
     parent_id: me.id,
+    family_id: me.id,
     group_id: group ? group.id : null,
-  });
+  };
+  DB.children.push(child);
+  saveChild(child).then((err) => { if (err && err !== 'not-saved') msg($('kidMsg'), `Could not save your child: ${err}`, true); else renderKids(); });
   ['cFirst', 'cLast', 'nick', 'inviteCode'].forEach((id) => { $(id).value = ''; });
   msg($('kidMsg'), `Child added. Student ID: ${student_id}`);
   renderHome();
@@ -3813,7 +3854,7 @@ function renderPHome() {
 }
 const P_FILTER = { child: 'all', status: 'all', cal: 'all' };
 function renderKids() {
-  const ul = $('kids');
+  const ul = $('kidsList');
   ul.innerHTML = '';
   const mine = myKids();
   if (!mine.length) return empty(ul, 'No children added yet.');
