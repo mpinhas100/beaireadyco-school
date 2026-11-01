@@ -2182,6 +2182,28 @@ const mapChildRow = (c) => ({
   id: c.id, nickname: c.nickname || c.first_name || '', first_name: c.first_name || '', last_name: c.last_name || '',
   student_id: c.student_id || '', family_id: c.parent_id, parent_id: c.parent_id, group_id: c.group_id || null,
 });
+async function loadTeacherChildren() {
+  if (!sb) return;
+  const r = await sb.from('children').select('id,parent_id,nickname,first_name,last_name,student_id,group_id').order('created_at');
+  if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
+}
+// When the app comes back to the screen, pull the latest children so admin, parent and teacher stay in step.
+let peopleRefreshing = false;
+async function refreshPeople() {
+  if (!sb || !me || peopleRefreshing) return;
+  peopleRefreshing = true;
+  try {
+    if (me.dbRole === 'parent') await loadMyChildren();
+    else if (me.dbRole === 'admin') await loadFamilies();
+    else if (me.dbRole === 'teacher') await loadTeacherChildren();
+    else return;
+    const typing = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+    const editing = typeof ADMIN_UI !== 'undefined' && (ADMIN_UI.stuEdit || ADMIN_UI.famEdit);
+    if (!typing && !editing && currentKey) { const y = window.scrollY; goto(currentKey); window.scrollTo(0, y); }
+  } catch (e) {} finally { peopleRefreshing = false; }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshPeople(); });
+setInterval(() => { if (!document.hidden) refreshPeople(); }, 30000);
 async function loadMyChildren() {
   if (!sb || !me) return;
   const r = await sb.from('children').select('id,parent_id,nickname,first_name,last_name,student_id,group_id').eq('parent_id', me.id).order('created_at');
@@ -2415,6 +2437,7 @@ async function loadSupabaseProfile() {
     me.teacherId = tr.data ? tr.data.id : null;
   }
   if (prof.role === 'parent') { try { await loadMyChildren(); } catch (e) {} }
+  if (prof.role === 'teacher') { try { await loadTeacherChildren(); } catch (e) {} }
   if (['admin', 'staff', 'teacher'].includes(prof.role)) {
     try { await loadStaffData(); } catch (e) { msg($('authMsg'), `Could not load classes: ${e.message}`, true); }
   }
