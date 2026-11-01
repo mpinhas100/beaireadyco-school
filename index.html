@@ -2187,6 +2187,19 @@ async function loadTeacherChildren() {
   const r = await sb.from('children').select('id,parent_id,nickname,first_name,last_name,student_id,group_id').order('created_at');
   if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
 }
+// ---- Auto-update: if a newer version of the app is published, reload into it (no need to close the app) ----
+const APP_BUILD = '20261101230929';
+async function checkForUpdate() {
+  try {
+    const r = await fetch('/version.txt?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const v = (await r.text()).trim();
+    const typing = document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+    if (v && v !== APP_BUILD && !typing) location.reload();
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
+setInterval(() => { if (!document.hidden) checkForUpdate(); }, 120000);
 // When the app comes back to the screen, pull the latest children so admin, parent and teacher stay in step.
 let peopleRefreshing = false;
 async function refreshPeople() {
@@ -3226,14 +3239,15 @@ $('addStudentForm').onsubmit = (e) => {
   const c = { id: newUuid(), nickname: first, first_name: first, last_name: last, student_id: newStudentId(), parent_id: fam.parentId, family_id: fam.id, group_id: $('addStudentGroup').value || null, email, dob, grade };
   DB.children.push(c);
   saveChild(c).then((err) => {
-    if (err === 'not-saved') msg($('studentsMsg'), `${first} was added for now, but this family has no approved parent account, so it will not be saved.`, true);
+    if (err === 'not-saved') msg($('studentsMsg'), `${first} could not be saved: this family has no approved parent account yet. Families appear here when a parent signs in and you approve them.`, true);
     else if (err) msg($('studentsMsg'), `Could not save ${first}: ${err}`, true);
+    else msg($('studentsMsg'), `${first} added and saved to ${fam.name}. The parent will see ${first} within 30 seconds.`);
   });
   if (email) {
     DB.users[`child_${c.id}`] = { id: uid('k'), name: [first, last].filter(Boolean).join(' '), email, password: 'demo1234', role: 'child', childId: c.id };
   }
   e.target.reset();
-  msg($('studentsMsg'), `${first} added to ${fam.name}.${email ? ' Child sign-in created (demo password demo1234).' : ''}`);
+  msg($('studentsMsg'), `Saving ${first}…`);
   renderGroups();
 };
 const ADMIN_UI = { famOpen: new Set(), famEdit: null, stuEdit: null, teacherEdit: null };
