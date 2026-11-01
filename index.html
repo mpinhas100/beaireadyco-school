@@ -682,6 +682,29 @@ main.anon #auth .top-brand .form-ai{background:linear-gradient(90deg,#ffffff 0%,
 .p-prof-menu button{background:transparent;color:#1e293b;text-align:left;border:0;border-radius:10px;padding:10px 12px;font:inherit;font-size:15px;cursor:pointer;margin:0;width:100%}
 .p-prof-menu button:hover{background:#f1f5f9}
 .push-box{margin-top:18px;padding-top:14px;border-top:1px solid #e5e7eb}.push-box h3{margin:0 0 4px;font-size:16px}.push-box button{margin-top:8px}
+.msgapp{max-width:760px}
+.msg-top{display:flex;gap:10px;align-items:center;margin:0 0 12px;flex-wrap:wrap}
+.msg-top input{flex:1;min-width:180px;margin:0}
+.msg-top button{width:auto;margin:0;white-space:nowrap}
+.msg-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.msg-item{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;background:#fff;border:1px solid #e5e9f5;border-radius:16px;padding:12px 14px;cursor:pointer;color:inherit;font:inherit;margin:0}
+.msg-item:hover{border-color:#c7d2fe}
+.msg-av{flex:0 0 40px;width:40px;height:40px;border-radius:50%;background:#ede9fe;color:#5b21b6;display:grid;place-items:center;font-weight:700;font-size:15px}
+.msg-main{flex:1;min-width:0}
+.msg-name{font-weight:700;display:flex;justify-content:space-between;gap:8px}
+.msg-name small{font-weight:500;color:#64748b;white-space:nowrap}
+.msg-sub{color:#64748b;font-size:14px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msg-dot{width:9px;height:9px;border-radius:50%;background:#2563eb;display:inline-block;margin-left:6px;vertical-align:middle}
+.msg-head{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.msg-head h2{margin:0;font-size:19px}
+.msg-head p{margin:2px 0 0;color:#64748b;font-size:14px}
+.msg-thread{display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid #e5e9f5;border-radius:16px;padding:14px;max-height:55vh;overflow-y:auto;margin-bottom:12px}
+.bubble{max-width:82%;padding:9px 13px;border-radius:16px;background:#f1f5f9;white-space:pre-wrap;word-wrap:break-word;line-height:1.4}
+.bubble.mine{align-self:flex-end;background:#4f46e5;color:#fff}
+.bubble small{display:block;font-size:11px;opacity:.7;margin-top:4px}
+.bubble .about{display:block;font-size:12px;opacity:.8;margin-bottom:3px;font-weight:600}
+.msg-compose textarea{width:100%;box-sizing:border-box;min-height:84px}
+.msg-compose button{margin-top:8px}
 .p-bell{position:relative;flex:0 0 auto;width:42px;height:42px;border-radius:14px;border:0;background:#eef3ff;color:#1d3fa8;display:grid;place-items:center;cursor:pointer;padding:0;margin:0 6px 0 0}
 .p-bell svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .p-badge{position:absolute;top:6px;right:6px;min-width:16px;height:16px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;padding:0 4px;border:2px solid #fff}
@@ -1412,6 +1435,9 @@ a.qa-tile{text-decoration:none;color:inherit}
   <!-- Messages (parent) -->
   <section id="pMessages" class="hidden p-page">
     <h1>Messages</h1>
+    <div class="msgapp"></div>
+    <div hidden class="legacy-msg">
+    <h1>Messages</h1>
     <div class="card">
       <p class="sub" style="margin:0 0 10px">Prototype: messages are kept in memory only and reset on refresh.</p>
       <ul class="p-list" id="pMsgList"></ul>
@@ -1426,6 +1452,7 @@ a.qa-tile{text-decoration:none;color:inherit}
       </form>
       <p class="msg" id="pReplyMsg" role="status"></p>
     </div>
+  </div>
   </section>
 
   <!-- Resources (parent) -->
@@ -1564,6 +1591,9 @@ a.qa-tile{text-decoration:none;color:inherit}
   </section>
 
   <section id="tMessages" class="hidden p-page">
+    <h1>Messages</h1>
+    <div class="msgapp"></div>
+    <div hidden class="legacy-msg">
     <div class="p-card">
       <h1>Messages</h1>
       <p class="muted">Messages from parents of students in your classes.</p>
@@ -1578,6 +1608,7 @@ a.qa-tile{text-decoration:none;color:inherit}
         <button type="submit">Send reply</button>
       </form>
     </div>
+  </div>
   </section>
 
   <section id="tActivity" class="hidden p-page">
@@ -1628,6 +1659,9 @@ a.qa-tile{text-decoration:none;color:inherit}
 
   <!-- Messages: parents, teachers and admin -->
   <section id="inbox" class="hidden p-page">
+    <h1>Messages</h1>
+    <div class="msgapp"></div>
+    <div hidden class="legacy-msg">
     <div class="p-card">
       <h1>Messages</h1>
       <p class="muted">Message BeAIReadyCo Admin, teachers and parents. Push delivery is not connected in the prototype yet.</p>
@@ -1642,6 +1676,7 @@ a.qa-tile{text-decoration:none;color:inherit}
         <button type="submit">Send</button>
       </form>
     </div>
+  </div>
   </section>
 
   <section id="child" class="hidden">
@@ -2193,7 +2228,7 @@ async function loadTeacherChildren() {
   if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
 }
 // ---- Auto-update: if a newer version of the app is published, reload into it (no need to close the app) ----
-const APP_BUILD = '20261101234727';
+const APP_BUILD = '20261101235231';
 async function checkForUpdate() {
   try {
     const r = await fetch('/version.txt?t=' + Date.now(), { cache: 'no-store' });
@@ -5200,6 +5235,161 @@ attachStudentPicker($('assignStudent'), $('assignPick'));
 attachStudentPicker($('unlockStudent'), $('unlockPick'));
 
 addSlotRow();
+
+/* ---------- Messages (admin, teachers, parents) ---------- */
+const MSG = { contacts: [], messages: [], view: 'list', peer: null, child: null, q: '', loaded: false, loading: false };
+const MSG_SECTIONS = ['inbox', 'pMessages', 'tMessages'];
+function msgPeerOf(m) { return m.sender_id === me.id ? m.recipient_id : m.sender_id; }
+function msgPerson(id) { return MSG.contacts.find((c) => c.id === id && c.kind === 'person') || null; }
+function msgName(id) { const p = msgPerson(id); return p ? p.name : 'User'; }
+function msgChildName(cid) {
+  const c = MSG.contacts.find((x) => x.child_id === cid);
+  if (c) return c.name;
+  const k = DB.children.find((x) => x.id === cid);
+  return k ? (k.nickname || k.first_name) : '';
+}
+function msgTime(t) {
+  const d = new Date(t); const now = new Date();
+  return d.toDateString() === now.toDateString() ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+async function loadMsgData() {
+  if (!sb || !me || MSG.loading) return;
+  MSG.loading = true;
+  try {
+    const [C, M] = await Promise.all([
+      sb.rpc('message_contacts'),
+      sb.from('messages').select('id,sender_id,recipient_id,child_id,body,created_at,read_at').or(`sender_id.eq.${me.id},recipient_id.eq.${me.id}`).order('created_at').limit(1000),
+    ]);
+    if (!C.error) MSG.contacts = C.data || [];
+    if (!M.error) MSG.messages = M.data || [];
+    MSG.loaded = true;
+  } finally { MSG.loading = false; }
+}
+function msgSearchLabel() {
+  if (me.dbRole === 'admin') return 'Search students, teachers and parents';
+  if (me.dbRole === 'teacher') return 'Search your students and their parents';
+  return 'Search teachers and BeAIReadyCo';
+}
+function renderMsgApp(secId) {
+  const box = $(secId) && $(secId).querySelector('.msgapp');
+  if (!box) return;
+  drawMsgApp(box);
+  loadMsgData().then(() => { if (currentView === secId) { const typing = document.activeElement && box.contains(document.activeElement) && /TEXTAREA|INPUT/.test(document.activeElement.tagName); if (!typing) drawMsgApp(box); } });
+}
+function drawMsgApp(box) {
+  box.innerHTML = '';
+  if (MSG.view === 'thread' && MSG.peer) return drawMsgThread(box);
+  if (MSG.view === 'new') return drawMsgNew(box);
+  drawMsgList(box);
+}
+function drawMsgList(box) {
+  const top = mk('div', { cls: 'msg-top' });
+  const q = mk('input', { type: 'search', placeholder: 'Search messages', 'aria-label': 'Search messages', maxlength: 80 });
+  q.value = MSG.q;
+  q.oninput = () => { MSG.q = q.value; paint(); };
+  top.append(q, mk('button', { type: 'button', text: '+ New message', on: () => { MSG.view = 'new'; MSG.q = ''; drawMsgApp(box); } }));
+  const ul = mk('ul', { cls: 'msg-list' });
+  box.append(top, ul);
+  function paint() {
+    ul.innerHTML = '';
+    const threads = new Map();
+    MSG.messages.forEach((m) => { const p = msgPeerOf(m); const t = threads.get(p) || { peer: p, last: null, unread: 0 }; t.last = m; if (m.recipient_id === me.id && !m.read_at) t.unread += 1; threads.set(p, t); });
+    let list = [...threads.values()].sort((a, b) => (a.last.created_at < b.last.created_at ? 1 : -1));
+    const needle = MSG.q.trim().toLowerCase();
+    if (needle) list = list.filter((t) => [msgName(t.peer), (msgPerson(t.peer) || {}).detail, t.last.body].filter(Boolean).some((v) => v.toLowerCase().includes(needle)));
+    if (!MSG.loaded && !list.length) return ul.appendChild(mk('li', { cls: 'muted', text: 'Loading messages…' }));
+    if (!list.length) return ul.appendChild(mk('li', { cls: 'muted', text: needle ? 'No messages match.' : 'No messages yet. Tap "+ New message" to start one.' }));
+    list.forEach((t) => {
+      const name = msgName(t.peer);
+      const b = mk('button', { type: 'button', cls: 'msg-item', on: () => openMsgThread(t.peer, t.last.child_id || null, box) },
+        mk('span', { cls: 'msg-av', text: initials(name) }),
+        mk('span', { cls: 'msg-main' },
+          mk('span', { cls: 'msg-name' }, mk('span', null, name, t.unread ? mk('span', { cls: 'msg-dot', 'aria-label': 'Unread' }) : ''), mk('small', { text: msgTime(t.last.created_at) })),
+          mk('span', { cls: 'msg-sub', text: `${t.last.sender_id === me.id ? 'You: ' : ''}${t.last.body}` })));
+      ul.appendChild(mk('li', null, b));
+    });
+  }
+  paint();
+}
+function drawMsgNew(box) {
+  const head = mk('div', { cls: 'msg-head' }, mk('button', { type: 'button', cls: 'back-home', text: '‹ All messages', on: () => { MSG.view = 'list'; drawMsgApp(box); } }));
+  const q = mk('input', { type: 'search', placeholder: msgSearchLabel(), 'aria-label': msgSearchLabel(), maxlength: 80 });
+  const ul = mk('ul', { cls: 'msg-list' });
+  box.append(head, mk('h2', { text: 'New message', style: 'margin:0 0 10px' }), mk('div', { cls: 'msg-top' }, q), ul);
+  function paint() {
+    ul.innerHTML = '';
+    const needle = q.value.trim().toLowerCase();
+    let list = MSG.contacts.filter((c) => !needle || [c.name, c.detail].filter(Boolean).some((v) => v.toLowerCase().includes(needle)));
+    list = list.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'person' ? -1 : 1)).slice(0, 60);
+    if (!MSG.loaded && !list.length) return ul.appendChild(mk('li', { cls: 'muted', text: 'Loading…' }));
+    if (!list.length) return ul.appendChild(mk('li', { cls: 'muted', text: needle ? 'No one matches.' : 'No one to message yet.' }));
+    list.forEach((c) => {
+      ul.appendChild(mk('li', null, mk('button', { type: 'button', cls: 'msg-item', on: () => openMsgThread(c.id, c.child_id || null, box) },
+        mk('span', { cls: 'msg-av', text: initials(c.name) }),
+        mk('span', { cls: 'msg-main' }, mk('span', { cls: 'msg-name' }, mk('span', { text: c.name })), mk('span', { cls: 'msg-sub', text: c.detail || '' })))));
+    });
+  }
+  q.oninput = paint;
+  paint();
+  setTimeout(() => q.focus(), 50);
+}
+function openMsgThread(peer, child, box) {
+  MSG.view = 'thread'; MSG.peer = peer; MSG.child = child;
+  drawMsgApp(box);
+  const unread = MSG.messages.filter((m) => m.sender_id === peer && m.recipient_id === me.id && !m.read_at);
+  if (unread.length) {
+    const now = new Date().toISOString();
+    unread.forEach((m) => { m.read_at = now; });
+    sb.from('messages').update({ read_at: now }).in('id', unread.map((m) => m.id)).then(() => {});
+  }
+}
+function drawMsgThread(box) {
+  const p = msgPerson(MSG.peer);
+  const name = p ? p.name : 'User';
+  const about = MSG.child ? msgChildName(MSG.child) : '';
+  box.append(mk('div', { cls: 'msg-head' }, mk('button', { type: 'button', cls: 'back-home', text: '‹ All messages', on: () => { MSG.view = 'list'; MSG.peer = null; drawMsgApp(box); } })));
+  box.append(mk('div', { cls: 'msg-head' }, mk('span', { cls: 'msg-av', text: initials(name) }),
+    mk('div', null, mk('h2', { text: name }), mk('p', { text: [p && p.detail, about && `About ${about}`].filter(Boolean).join(' · ') }))));
+  const th = mk('div', { cls: 'msg-thread' });
+  const msgs = MSG.messages.filter((m) => msgPeerOf(m) === MSG.peer);
+  if (!msgs.length) th.appendChild(mk('p', { cls: 'muted', text: 'No messages yet. Write the first one below.' }));
+  msgs.forEach((m) => {
+    const b = mk('div', { cls: `bubble${m.sender_id === me.id ? ' mine' : ''}` });
+    if (m.child_id) b.appendChild(mk('span', { cls: 'about', text: `About ${msgChildName(m.child_id)}` }));
+    b.append(m.body, mk('small', { text: `${msgTime(m.created_at)}${m.sender_id === me.id && m.read_at ? ' · Read' : ''}` }));
+    th.appendChild(b);
+  });
+  const ta = mk('textarea', { maxlength: 4000, rows: 3, placeholder: `Write to ${name}`, 'aria-label': 'Message', required: true });
+  const note = mk('p', { cls: 'msg', role: 'status' });
+  const form = mk('form', { cls: 'msg-compose' }, ta, mk('button', { type: 'submit', text: 'Send' }), note);
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const body = ta.value.trim();
+    if (!body) return;
+    const btn = form.querySelector('button'); btn.disabled = true;
+    const row = { sender_id: me.id, recipient_id: MSG.peer, child_id: MSG.child || null, body };
+    const r = await sb.from('messages').insert(row).select('id,sender_id,recipient_id,child_id,body,created_at,read_at').single();
+    btn.disabled = false;
+    if (r.error) return msg(note, 'Could not send. Please try again.', true);
+    MSG.messages.push(r.data);
+    ta.value = '';
+    drawMsgApp(box);
+  };
+  box.append(th, form);
+  th.scrollTop = th.scrollHeight;
+}
+MSG_SECTIONS.forEach((sec) => { P_RENDER[sec] = () => renderMsgApp(sec); });
+(() => {
+  const go = new URLSearchParams(location.search).get('go');
+  if (go !== 'messages') return;
+  const tryOpen = () => {
+    if (!me) return setTimeout(tryOpen, 500);
+    history.replaceState(null, '', location.pathname);
+    const it = menuFor().find((i) => MSG_SECTIONS.includes(i.section));
+    if (it) goto(it.key);
+  };
+  setTimeout(tryOpen, 800);
+})();
 </script>
 </body>
 </html>
