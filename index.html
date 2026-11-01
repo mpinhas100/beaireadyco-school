@@ -1132,7 +1132,6 @@ a.qa-tile{text-decoration:none;color:inherit}
       <div class="gact-row" role="group" aria-label="Group actions">
         <button type="button" class="secondary" data-gact-btn="create" aria-pressed="false">+ Create group</button>
         <button type="button" class="secondary" data-gact-btn="register" aria-pressed="false">Register link</button>
-        <button type="button" class="secondary" data-gact-btn="addteacher" aria-pressed="false">+ Add teacher</button>
         <button type="button" class="secondary" data-gact-btn="find" aria-pressed="false">Find</button>
         <button type="button" class="secondary" data-gact-btn="assign" aria-pressed="false">Assign</button>
       </div>
@@ -1163,17 +1162,6 @@ a.qa-tile{text-decoration:none;color:inherit}
         <input id="inviteLink" readonly>
         <button type="button" class="secondary" id="copyInvite">Copy link</button>
         <p class="msg" id="inviteMsg" role="status"></p>
-      </div>
-
-      <div class="gact" data-gact="addteacher" hidden>
-        <h3 style="margin:4px 0 4px">Add a teacher</h3>
-        <form id="addTeacherForm">
-          <div class="form-grid">
-            <div><label for="teacherName">Teacher name</label><input id="teacherName" maxlength="80" required></div>
-            <div><label for="teacherEmail">Teacher email</label><input id="teacherEmail" type="email" maxlength="120" required></div>
-          </div>
-          <button type="submit">Add teacher</button>
-        </form>
       </div>
 
       <div class="gact" data-gact="find" hidden>
@@ -1207,8 +1195,6 @@ a.qa-tile{text-decoration:none;color:inherit}
 
       <p class="msg" id="groupsMsg" role="status"></p>
       <h3 style="margin:14px 0 4px">Your groups</h3>
-      <h3 style="margin:14px 0 6px">Teachers</h3>
-      <div id="teacherList"></div>
       <ul class="list" id="groupList"></ul>
         <h3 style="margin:14px 0 4px">Groups calendar (weekly)</h3>
         <div class="gcal" id="groupCal"></div>
@@ -1217,11 +1203,12 @@ a.qa-tile{text-decoration:none;color:inherit}
 
   <!-- Students (admin) -->
   <section id="students" class="hidden">
-    <h1>Students</h1>
+    <h1>Students &amp; Teachers</h1>
     <div class="card hidden" id="stuDetail" style="margin-bottom:14px"></div>
     <div class="gact-row" role="group" aria-label="Family and student actions">
       <button type="button" class="secondary" data-gact-btn="addfamily" aria-pressed="false">+ Add family</button>
       <button type="button" class="secondary" data-gact-btn="addstudent" aria-pressed="false">+ Add student</button>
+      <button type="button" class="secondary" data-gact-btn="addteacher" aria-pressed="false">+ Add teacher</button>
     </div>
     <p class="msg" id="studentsMsg" role="status"></p>
     <div class="gact" data-gact="addfamily" hidden>
@@ -1253,6 +1240,18 @@ a.qa-tile{text-decoration:none;color:inherit}
       </form>
     </div>
 
+    <div class="gact" data-gact="addteacher" hidden>
+      <h3 style="margin:4px 0 4px">Add a teacher</h3>
+      <form id="addTeacherForm">
+        <div class="form-grid">
+          <div><label for="teacherName">Teacher name</label><input id="teacherName" maxlength="80" required></div>
+          <div><label for="teacherEmail">Teacher email</label><input id="teacherEmail" type="email" maxlength="120" required></div>
+        </div>
+        <button type="submit">Add teacher</button>
+      </form>
+    </div>
+
+
     <div class="card" data-panel="students">
       <h2>Families and students</h2>
       <div id="familyList"></div>
@@ -1263,6 +1262,12 @@ a.qa-tile{text-decoration:none;color:inherit}
       <input id="stuSearch" maxlength="80" autocomplete="off">
       <ul class="list" id="stuList"></ul>
       <p class="muted" style="font-size:13px;margin:12px 0 0">Students appear by first name and last initial only.</p>
+    </div>
+    <div class="card">
+      <h2>Teachers</h2>
+      <p class="muted">Teachers sign in with Google using the email you add here.</p>
+      <div id="teacherList"></div>
+      <p class="msg" id="teachersMsg" role="status"></p>
     </div>
   </section>
 
@@ -1874,7 +1879,7 @@ const MENUS = {
     { key: 'groups', label: 'Groups', section: 'quizzes' },
     { key: 'approvals', label: 'Approvals', section: 'quizzes' },
     { key: 'lessons', label: 'Lessons', section: 'lessons' },
-    { key: 'students', label: 'Students', section: 'students' },
+    { key: 'students', label: 'Students & Teachers', section: 'students' },
     { key: 'inbox', label: 'Messages', section: 'inbox' },
     { key: 'settings', label: 'Settings', section: 'settings' },
   ],
@@ -2188,7 +2193,7 @@ async function loadTeacherChildren() {
   if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
 }
 // ---- Auto-update: if a newer version of the app is published, reload into it (no need to close the app) ----
-const APP_BUILD = '20261101230929';
+const APP_BUILD = '20261101234727';
 async function checkForUpdate() {
   try {
     const r = await fetch('/version.txt?t=' + Date.now(), { cache: 'no-store' });
@@ -2790,6 +2795,7 @@ ICONS.settings = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path 
 function renderStudents() {
   fillStudentSelects();
   renderFamilies();
+  renderTeachers();
   $('stuSearch').value = '';
   drawStudents('');
 }
@@ -3204,13 +3210,13 @@ $('addTeacherForm').onsubmit = async (e) => {
   e.preventDefault();
   const name = $('teacherName').value.trim();
   const email = $('teacherEmail').value.trim().toLowerCase();
-  if (findUserByEmail(email)) return msg($('groupsMsg'), 'That email already has an account.', true);
+  if (findUserByEmail(email)) return msg($('studentsMsg'), 'That email already has an account.', true);
   const r = await sb.from('teachers').insert({ full_name: name, email });
-  if (r.error) return msg($('groupsMsg'), r.error.code === '23505' ? 'That email is already a teacher.' : `Could not add the teacher: ${r.error.message}`, true);
+  if (r.error) return msg($('studentsMsg'), r.error.code === '23505' ? 'That email is already a teacher.' : `Could not add the teacher: ${r.error.message}`, true);
   e.target.reset();
   await loadTeachers();
-  msg($('groupsMsg'), `${name} added as a teacher. They can sign in with Google to see their classes.`);
-  renderGroups();
+  msg($('studentsMsg'), `${name} added as a teacher. They can sign in with Google to see their classes.`);
+  renderTeachers(); fillGroupTeacherSelect();
 };
 $('addFamilyForm').onsubmit = (e) => {
   e.preventDefault();
@@ -3297,18 +3303,18 @@ function teacherRow(t) {
       mk('div', { cls: 'form-grid' }, labeled('Teacher name', name), labeled('Teacher email', em)),
       mk('div', { cls: 'row-actions' },
         mk('button', { type: 'submit', text: 'Save teacher' }),
-        mk('button', { type: 'button', cls: 'secondary', text: 'Cancel', on: () => { ADMIN_UI.teacherEdit = null; renderGroups(); } })));
+        mk('button', { type: 'button', cls: 'secondary', text: 'Cancel', on: () => { ADMIN_UI.teacherEdit = null; renderTeachers(); fillGroupTeacherSelect(); } })));
     form.onsubmit = async (e) => {
       e.preventDefault();
       const addr = em.value.trim().toLowerCase();
       const clash = findUserByEmail(addr);
-      if (clash && clash.id !== t.id) return msg($('groupsMsg'), 'Another account already uses that email.', true);
+      if (clash && clash.id !== t.id) return msg($('teachersMsg'), 'Another account already uses that email.', true);
       const r = await sb.from('teachers').update({ full_name: name.value.trim() || t.name, email: addr }).eq('id', t.id);
-      if (r.error) return msg($('groupsMsg'), r.error.code === '23505' ? 'That email is already a teacher.' : `Could not save the teacher: ${r.error.message}`, true);
+      if (r.error) return msg($('teachersMsg'), r.error.code === '23505' ? 'That email is already a teacher.' : `Could not save the teacher: ${r.error.message}`, true);
       ADMIN_UI.teacherEdit = null;
       await loadTeachers();
-      msg($('groupsMsg'), 'Teacher saved.');
-      renderGroups();
+      msg($('teachersMsg'), 'Teacher saved.');
+      renderTeachers(); fillGroupTeacherSelect();
     };
     return mk('li', null, form);
   }
@@ -3316,14 +3322,14 @@ function teacherRow(t) {
   return mk('li', null,
     mk('div', { text: `${t.name} · ${t.email} · ${n} class${n === 1 ? '' : 'es'}` }),
     mk('div', { cls: 'row-actions' },
-      mk('button', { type: 'button', cls: 'secondary', text: 'Edit', on: () => { ADMIN_UI.teacherEdit = t.id; renderGroups(); } }),
+      mk('button', { type: 'button', cls: 'secondary', text: 'Edit', on: () => { ADMIN_UI.teacherEdit = t.id; renderTeachers(); fillGroupTeacherSelect(); } }),
       deleteButton('Remove', async () => {
         const r = await sb.from('teachers').delete().eq('id', t.id);
-        if (r.error) return msg($('groupsMsg'), `Could not remove the teacher: ${r.error.message}`, true);
+        if (r.error) return msg($('teachersMsg'), `Could not remove the teacher: ${r.error.message}`, true);
         DB.groups.forEach((g) => { if (g.teacherId === t.id) g.teacherId = null; });
         await loadTeachers();
-        msg($('groupsMsg'), `${t.name} removed. Their classes now need a teacher.`);
-        renderGroups();
+        msg($('teachersMsg'), `${t.name} removed. Their classes now need a teacher.`);
+        renderTeachers(); fillGroupTeacherSelect();
       })));
 }
 function familyEditForm(f) {
