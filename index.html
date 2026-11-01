@@ -2139,6 +2139,26 @@ async function loadStaffData() {
       format: g.format || 'in-person', zoomUrl: g.zoom_url || '', inviteCode: g.invite_code || '',
     };
   }));
+  if (me && me.dbRole === 'admin') await loadFamilies();
+}
+// Admin: every approved parent shows as a family, with their children from the database.
+async function loadFamilies() {
+  const [P, R, C] = await Promise.all([
+    sb.from('profiles').select('id,full_name,created_at').eq('role', 'parent').order('created_at'),
+    sb.from('access_requests').select('user_id,email,full_name'),
+    sb.from('children').select('id,parent_id,nickname,first_name,last_name,student_id,group_id').order('created_at'),
+  ]);
+  if (P.error) return;
+  const req = new Map(((R && R.data) || []).map((r) => [r.user_id, r]));
+  replaceAll(DB.families, P.data.map((p) => {
+    const r = req.get(p.id) || {};
+    const name = p.full_name || r.full_name || r.email || 'Parent';
+    return { id: p.id, name: `${name} family`, parentName: name, parentEmail: r.email || '', parentId: p.id };
+  }));
+  replaceAll(DB.children, ((C && !C.error && C.data) || []).map((c) => ({
+    id: c.id, nickname: c.nickname || c.first_name || '', first_name: c.first_name || '', last_name: c.last_name || '',
+    student_id: c.student_id || '', family_id: c.parent_id, parent_id: c.parent_id, group_id: c.group_id || null,
+  })));
 }
 // Saves lessons, quizzes and classes. Returns an error message, or null on success.
 async function saveStaffData() {
