@@ -677,6 +677,7 @@ main.anon #auth .top-brand .form-ai{background:linear-gradient(90deg,#ffffff 0%,
 .p-prof-menu{position:fixed;top:70px;right:16px;display:flex;flex-direction:column;min-width:200px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 40px rgba(15,23,70,.2);padding:6px;z-index:60}
 .p-prof-menu button{background:transparent;color:#1e293b;text-align:left;border:0;border-radius:10px;padding:10px 12px;font:inherit;font-size:15px;cursor:pointer;margin:0;width:100%}
 .p-prof-menu button:hover{background:#f1f5f9}
+.push-box{margin-top:18px;padding-top:14px;border-top:1px solid #e5e7eb}.push-box h3{margin:0 0 4px;font-size:16px}.push-box button{margin-top:8px}
 .p-bell{position:relative;flex:0 0 auto;width:42px;height:42px;border-radius:14px;border:0;background:#eef3ff;color:#1d3fa8;display:grid;place-items:center;cursor:pointer;padding:0;margin:0 6px 0 0}
 .p-bell svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .p-badge{position:absolute;top:6px;right:6px;min-width:16px;height:16px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;padding:0 4px;border:2px solid #fff}
@@ -1053,6 +1054,12 @@ a.qa-tile{text-decoration:none;color:inherit}
       <p class="muted">People who signed in with Google and asked for access. Choose their role, then approve.</p>
       <div id="approvalList"></div>
       <p class="msg" id="approvalMsg" role="status"></p>
+      <div class="push-box">
+        <h3>Phone alerts</h3>
+        <p class="muted" id="pushInfo">Get a notification on this phone when someone asks for access.</p>
+        <button type="button" id="pushBtn">Turn on phone alerts</button>
+        <p class="msg" id="pushMsg" role="status"></p>
+      </div>
     </div>
     <div class="card" data-panel="quizzes">
       <ul class="list" id="quizList"></ul>
@@ -1965,8 +1972,81 @@ function renderANotes() {
     ul.appendChild(li);
   });
 }
+// ---- Phone alerts (Web Push) for admins ----
+const VAPID_PUBLIC = 'BBGLTvKOIXj74_KnyyK-7lywQco42z6pxA4YP77T7H6MOjmrnQOWGRNH93VyuRozn_EQln5UTx_sZXS3ZdVfrgU';
+const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+function urlB64ToBytes(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(s + '='.repeat((4 - (s.length % 4)) % 4));
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+async function savePushSub(sub) {
+  const j = sub.toJSON();
+  return sb.from('push_subscriptions').upsert({
+    user_id: me.id, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth,
+    device: navigator.userAgent.slice(0, 200),
+  }, { onConflict: 'endpoint' });
+}
+async function refreshPushUi() {
+  const btn = $('pushBtn'), info = $('pushInfo');
+  if (!btn) return;
+  btn.disabled = false;
+  if (!pushSupported()) {
+    btn.classList.add('hidden');
+    info.textContent = /iPhone|iPad/.test(navigator.userAgent) && !isStandalone()
+      ? 'To get alerts on your iPhone, open this app from its icon on your home screen (Share, then Add to Home Screen), then come back here.'
+      : 'This browser cannot show phone alerts.';
+    return;
+  }
+  btn.classList.remove('hidden');
+  const reg = await navigator.serviceWorker.getRegistration();
+  const sub = reg ? await reg.pushManager.getSubscription() : null;
+  if (sub && Notification.permission === 'granted') {
+    btn.textContent = 'Send a test alert';
+    info.textContent = 'Phone alerts are on for this device.';
+    savePushSub(sub).catch(() => {});
+  } else if (Notification.permission === 'denied') {
+    btn.classList.add('hidden');
+    info.textContent = 'Alerts are blocked for this app. Turn them on in your phone Settings, under Notifications.';
+  } else {
+    btn.textContent = 'Turn on phone alerts';
+    info.textContent = 'Get a notification on this phone when someone asks for access.';
+  }
+}
+$('pushBtn').onclick = async () => {
+  const btn = $('pushBtn');
+  btn.disabled = true;
+  msg($('pushMsg'), '');
+  try {
+    const reg = (await navigator.serviceWorker.getRegistration()) || (await navigator.serviceWorker.register('/sw.js'));
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (sub && Notification.permission === 'granted') {
+      const r = await sb.rpc('send_test_push');
+      msg($('pushMsg'), r.error ? 'Could not send a test alert. Please try again.' : 'Test alert sent. It should arrive in a few seconds.', !!r.error);
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { msg($('pushMsg'), 'Alerts were not allowed.', true); return; }
+    sub = sub || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToBytes(VAPID_PUBLIC) });
+    const r = await savePushSub(sub);
+    if (r.error) { msg($('pushMsg'), 'Could not save alerts for this phone. Please try again.', true); return; }
+    msg($('pushMsg'), 'Phone alerts are on.');
+  } catch (e) {
+    msg($('pushMsg'), 'Could not turn on alerts. Please try again.', true);
+  } finally {
+    refreshPushUi();
+  }
+};
 function startAdminBell() {
   refreshAdminBell();
+  refreshPushUi();
+  if (new URLSearchParams(location.search).get('go') === 'approvals') {
+    history.replaceState(null, '', location.pathname);
+    setTimeout(() => goto('approvals'), 300);
+  }
   if (!adminBellTimer) adminBellTimer = setInterval(refreshAdminBell, 60000);
 }
 function stopAdminBell() {
