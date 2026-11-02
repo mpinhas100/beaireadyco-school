@@ -477,6 +477,8 @@ main.anon #auth details.more[open] .more-body{position:absolute;bottom:calc(100%
 #quizList li{margin:0 0 10px}
 .quiz-btn{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%;text-align:left;padding:14px 16px;border-radius:14px;background:#f4f6ff;border:1px solid #dfe4ff;color:#0f1b4c;font-weight:700;font-size:15px;cursor:pointer}
 #quizBuildForm[hidden]{display:none}
+/* Quizzes are made in the Quiz Generator app, not in this app */
+#openQuizBuilder,#quizBuildForm{display:none!important}
 #openQuizBuilder{width:100%;margin:6px 0 8px}
 /* Menu picks show one panel at a time */
 .panel-off{display:none!important}
@@ -2280,7 +2282,7 @@ async function loadTeacherChildren() {
   if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
 }
 // ---- Auto-update: if a newer version of the app is published, reload into it (no need to close the app) ----
-const APP_BUILD = '20261102173356';
+const APP_BUILD = '20261102174845';
 async function checkForUpdate() {
   try {
     const r = await fetch('/version.txt?t=' + Date.now(), { cache: 'no-store' });
