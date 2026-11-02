@@ -801,7 +801,8 @@ main.anon #auth .top-brand .form-ai{background:linear-gradient(90deg,#ffffff 0%,
 body:not(.role-teacher) #tBell,body:not(.role-teacher) #tNotes,body:not(.role-teacher) #tProfMenu,body:not(.role-teacher) .who-chev{display:none!important}
 body.role-teacher #pProfBtn{cursor:pointer}
 .who-chev{color:#64748b;font-size:14px;margin-left:4px}
-.t-hero{min-height:260px;padding:24px 26px 30px;align-items:flex-start;justify-content:flex-start;background:#1e1b4b}
+.t-hero{min-height:260px;padding:24px 26px 30px;align-items:flex-start;justify-content:flex-start;background:#1e1b4b var(--hero-art) center 64%/cover no-repeat}
+.t-hero .hero-art{display:none!important}
 .t-hero .hero-art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;z-index:0}
 #tHome .t-hero::before{z-index:1;background:linear-gradient(270deg,rgba(15,23,70,.82) 0%,rgba(15,23,70,.4) 55%,rgba(15,23,70,.05) 100%)}
 .t-hero .p-hero-text{position:relative;z-index:2;margin-left:auto;text-align:right;max-width:60%}
@@ -2251,7 +2252,7 @@ async function loadTeacherChildren() {
   if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
 }
 // ---- Auto-update: if a newer version of the app is published, reload into it (no need to close the app) ----
-const APP_BUILD = '20261102002847';
+const APP_BUILD = '20261102004125';
 async function checkForUpdate() {
   try {
     const r = await fetch('/version.txt?t=' + Date.now(), { cache: 'no-store' });
