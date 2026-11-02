@@ -2282,7 +2282,7 @@ async function loadTeacherChildren() {
   if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
 }
 // ---- Auto-update: if a newer version of the app is published, reload into it (no need to close the app) ----
-const APP_BUILD = '20261102174845';
+const APP_BUILD = '20261102174940';
 async function checkForUpdate() {
   try {
     const r = await fetch('/version.txt?t=' + Date.now(), { cache: 'no-store' });
@@ -5562,6 +5562,8 @@ if (location.hostname === 'beaireadyco-school.pages.dev') setupGoogleButton();
 const CP = { items: [], loaded: false, loading: false, q: '', view: null, staged: [], urls: {} };
 const CP_BUCKET = 'coloring';
 ICONS.coloring = '<svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.5-.8 1.5-1.5 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.8.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.2-4-7.8-9-7.8z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg>';
+// Results page removed from every menu.
+Object.keys(MENUS).forEach((r) => { MENUS[r] = MENUS[r].filter((i) => i.key !== 'results'); });
 ['parent', 'teacher', 'staff'].forEach((r) => {
   const list = MENUS[r]; if (!list || list.some((i) => i.key === 'coloring')) return;
   const at = list.findIndex((i) => /settings/.test(i.key));
