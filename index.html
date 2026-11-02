@@ -712,6 +712,9 @@ main.anon #auth .top-brand .form-ai{background:linear-gradient(90deg,#ffffff 0%,
 .cp-nav button{width:auto;margin:0}
 .cp-widget-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 @media (max-width:600px){.cp-widget-grid{grid-template-columns:repeat(2,1fr)}}
+.msg-head button{width:auto;margin:0}
+.msg-del{display:block;margin:6px 0 0 auto;width:auto;padding:4px 10px;font-size:12px;border-radius:8px;background:#fee2e2;color:#b91c1c;border:0}
+.msg-del[hidden]{display:none}
 .msgapp{max-width:760px}
 .msg-top{display:flex;gap:10px;align-items:center;margin:0 0 12px;flex-wrap:wrap}
 .msg-top input{flex:1;min-width:180px;margin:0}
@@ -2282,7 +2285,7 @@ async function loadTeacherChildren() {
   if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
 }
 // ---- Auto-update: if a newer version of the app is published, reload into it (no need to close the app) ----
-const APP_BUILD = '20261102174940';
+const APP_BUILD = '20261102175434';
 async function checkForUpdate() {
   try {
     const r = await fetch('/version.txt?t=' + Date.now(), { cache: 'no-store' });
@@ -5338,10 +5341,10 @@ async function loadMsgData() {
   try {
     const [C, M] = await Promise.all([
       sb.rpc('message_contacts'),
-      sb.from('messages').select('id,sender_id,recipient_id,child_id,body,created_at,read_at').or(`sender_id.eq.${me.id},recipient_id.eq.${me.id}`).order('created_at').limit(1000),
+      sb.from('messages').select('id,sender_id,recipient_id,child_id,body,created_at,read_at,deleted_by_sender,deleted_by_recipient').or(`sender_id.eq.${me.id},recipient_id.eq.${me.id}`).order('created_at').limit(1000),
     ]);
     if (!C.error) MSG.contacts = C.data || [];
-    if (!M.error) MSG.messages = M.data || [];
+    if (!M.error) MSG.messages = (M.data || []).filter((m) => !((m.sender_id === me.id && m.deleted_by_sender) || (m.recipient_id === me.id && m.deleted_by_recipient)));
     MSG.loaded = true;
   } finally { MSG.loading = false; }
 }
@@ -5413,6 +5416,17 @@ function drawMsgNew(box) {
   paint();
   setTimeout(() => q.focus(), 50);
 }
+async function msgDelete(list) {
+  const mine = list.filter((m) => m.sender_id === me.id).map((m) => m.id);
+  const theirs = list.filter((m) => m.recipient_id === me.id).map((m) => m.id);
+  const ids = new Set(list.map((m) => m.id));
+  MSG.messages = MSG.messages.filter((m) => !ids.has(m.id));
+  const jobs = [];
+  if (mine.length) jobs.push(sb.from('messages').update({ deleted_by_sender: true }).in('id', mine));
+  if (theirs.length) jobs.push(sb.from('messages').update({ deleted_by_recipient: true }).in('id', theirs));
+  const res = await Promise.all(jobs);
+  return !res.some((r) => r.error);
+}
 function openMsgThread(peer, child, box) {
   MSG.view = 'thread'; MSG.peer = peer; MSG.child = child;
   drawMsgApp(box);
@@ -5427,7 +5441,9 @@ function drawMsgThread(box) {
   const p = msgPerson(MSG.peer);
   const name = p ? p.name : 'User';
   const about = MSG.child ? msgChildName(MSG.child) : '';
-  box.append(mk('div', { cls: 'msg-head' }, mk('button', { type: 'button', cls: 'back-home', text: '‹ All messages', on: () => { MSG.view = 'list'; MSG.peer = null; drawMsgApp(box); } })));
+  box.append(mk('div', { cls: 'msg-head', style: 'justify-content:space-between' },
+    mk('button', { type: 'button', cls: 'back-home', text: '‹ All messages', on: () => { MSG.view = 'list'; MSG.peer = null; drawMsgApp(box); } }),
+    deleteButton('Delete conversation', async () => { await msgDelete(MSG.messages.filter((m) => msgPeerOf(m) === MSG.peer)); MSG.view = 'list'; MSG.peer = null; drawMsgApp(box); })));
   box.append(mk('div', { cls: 'msg-head' }, mk('span', { cls: 'msg-av', text: initials(name) }),
     mk('div', null, mk('h2', { text: name }), mk('p', { text: [p && p.detail, about && `About ${about}`].filter(Boolean).join(' · ') }))));
   const th = mk('div', { cls: 'msg-thread' });
@@ -5437,6 +5453,11 @@ function drawMsgThread(box) {
     const b = mk('div', { cls: `bubble${m.sender_id === me.id ? ' mine' : ''}` });
     if (m.child_id) b.appendChild(mk('span', { cls: 'about', text: `About ${msgChildName(m.child_id)}` }));
     b.append(m.body, mk('small', { text: `${msgTime(m.created_at)}${m.sender_id === me.id && m.read_at ? ' · Read' : ''}` }));
+    const del = mk('button', { type: 'button', cls: 'msg-del', text: 'Delete', hidden: true, on: async (e) => { e.stopPropagation(); await msgDelete([m]); drawMsgApp(box); } });
+    b.appendChild(del);
+    b.style.cursor = 'pointer';
+    b.title = 'Tap to delete';
+    b.onclick = () => { del.hidden = !del.hidden; };
     th.appendChild(b);
   });
   const ta = mk('textarea', { maxlength: 4000, rows: 3, placeholder: `Write to ${name}`, 'aria-label': 'Message', required: true });
@@ -5494,7 +5515,7 @@ function drawMsgWidget(secId) {
     if (anchor && anchor.nextSibling) sec.insertBefore(w, anchor.nextSibling); else sec.insertBefore(w, sec.firstChild);
   }
   w.innerHTML = '';
-  const threads = msgThreads();
+  const threads = msgThreads().filter((t) => t.unread > 0);
   const unread = threads.reduce((n, t) => n + t.unread, 0);
   w.append(mk('div', { cls: 'msg-widget-head' },
     mk('h2', null, 'Messages', unread ? mk('span', { cls: 'msg-badge', text: `${unread} new` }) : ''),
@@ -5503,8 +5524,8 @@ function drawMsgWidget(secId) {
       mk('button', { type: 'button', cls: 'secondary', text: 'View all', on: () => openMessages('list') }))));
   const ul = mk('ul', { cls: 'msg-list' });
   if (!MSG.loaded && !threads.length) ul.appendChild(mk('li', { cls: 'muted', text: 'Loading messages…' }));
-  else if (!threads.length) ul.appendChild(mk('li', { cls: 'muted', text: 'No messages yet.' }));
-  threads.slice(0, 3).forEach((t) => {
+  else if (!threads.length) ul.appendChild(mk('li', { cls: 'muted', text: 'No new messages.' }));
+  threads.slice(0, 5).forEach((t) => {
     const name = msgName(t.peer);
     ul.appendChild(mk('li', null, mk('button', { type: 'button', cls: 'msg-item', on: () => openMessages('thread', t.peer, t.last.child_id || null) },
       mk('span', { cls: 'msg-av', text: initials(name) }),
