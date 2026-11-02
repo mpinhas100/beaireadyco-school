@@ -689,6 +689,27 @@ main.anon #auth .top-brand .form-ai{background:linear-gradient(90deg,#ffffff 0%,
 .msg-widget-actions{display:flex;gap:8px}
 .msg-widget-actions button{width:auto;margin:0;padding:8px 14px;font-size:14px}
 .msg-widget .msg-item{border-radius:14px;padding:10px 12px}
+.cp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:0;padding:0;list-style:none}
+.cp-card{display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid #e5e9f5;border-radius:16px;padding:10px;cursor:pointer;text-align:left;font:inherit;color:inherit;margin:0;width:100%}
+.cp-card img,.cp-thumb{width:100%;aspect-ratio:8.5/11;object-fit:contain;background:#f8fafc;border-radius:10px;border:1px solid #eef2f7;display:block}
+.cp-card strong{font-size:14px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.cp-top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
+.cp-top input[type=search]{flex:1;min-width:180px;margin:0}
+.cp-top button,.cp-top label.btnlike{width:auto;margin:0;white-space:nowrap}
+.cp-upload{background:#fff;border:1px dashed #a5b4fc;border-radius:16px;padding:14px;margin:0 0 16px}
+.cp-upload h2{margin:0 0 6px;font-size:18px}
+.cp-review{list-style:none;margin:10px 0;padding:0;display:grid;gap:10px}
+.cp-review li{display:flex;gap:10px;align-items:center;background:#f8fafc;border-radius:12px;padding:8px}
+.cp-review img{width:56px;height:72px;object-fit:contain;background:#fff;border:1px solid #e5e9f5;border-radius:6px;flex:none}
+.cp-review input{flex:1;margin:0;font-size:16px}
+.cp-review button{width:auto;margin:0;padding:6px 10px}
+.cp-view{background:#fff;border:1px solid #e5e9f5;border-radius:20px;padding:16px;text-align:center}
+.cp-view img{max-width:100%;max-height:62vh;object-fit:contain;border:1px solid #eef2f7;border-radius:12px;background:#fff}
+.cp-view h2{margin:12px 0 10px;font-size:20px}
+.cp-nav{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.cp-nav button{width:auto;margin:0}
+.cp-widget-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:600px){.cp-widget-grid{grid-template-columns:repeat(2,1fr)}}
 .msgapp{max-width:760px}
 .msg-top{display:flex;gap:10px;align-items:center;margin:0 0 12px;flex-wrap:wrap}
 .msg-top input{flex:1;min-width:180px;margin:0}
@@ -1683,6 +1704,11 @@ a.qa-tile{text-decoration:none;color:inherit}
   </section>
 
   <!-- Messages: parents, teachers and admin -->
+  <section id="coloring" class="hidden p-page">
+    <h1>Printable Coloring Pages</h1>
+    <div class="colorapp"></div>
+  </section>
+
   <section id="inbox" class="hidden p-page">
     <h1>Messages</h1>
     <div class="msgapp"></div>
@@ -2052,7 +2078,7 @@ function goBack() {
   }, { passive: true });
 })();
 function show(view) {
-  ['auth', 'adminCal', 'welcome', 'lessons', 'viewer', 'quizzes', 'home', 'child', 'students', 'settings', 'kids', 'classes', 'pProjects', 'pProgress', 'pCalendar', 'pMessages', 'pResources', 'pSettings', 'pProfile', 'tHome', 'tClasses', 'tStudents', 'tResources', 'tCalendar', 'tMessages', 'tActivity', 'tSettings', 'tProfile', 'inbox'].forEach((v) => $(v).classList.toggle('hidden', v !== view));
+  ['auth', 'adminCal', 'welcome', 'lessons', 'viewer', 'quizzes', 'home', 'child', 'students', 'settings', 'kids', 'classes', 'pProjects', 'pProgress', 'pCalendar', 'pMessages', 'pResources', 'pSettings', 'pProfile', 'tHome', 'tClasses', 'tStudents', 'tResources', 'tCalendar', 'tMessages', 'tActivity', 'tSettings', 'tProfile', 'inbox', 'coloring'].forEach((v) => $(v).classList.toggle('hidden', v !== view));
   document.querySelector('main').classList.toggle('anon', view === 'auth');
   $('topSignOut').classList.toggle('hidden', view === 'auth');
   trackView(view);
@@ -2254,7 +2280,7 @@ async function loadTeacherChildren() {
   if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
 }
 // ---- Auto-update: if a newer version of the app is published, reload into it (no need to close the app) ----
-const APP_BUILD = '20261102171456';
+const APP_BUILD = '20261102173356';
 async function checkForUpdate() {
   try {
     const r = await fetch('/version.txt?t=' + Date.now(), { cache: 'no-store' });
@@ -5529,6 +5555,229 @@ async function setupGoogleButton(tries = 0) {
 }
 finishGoogleSignIn();
 if (location.hostname === 'beaireadyco-school.pages.dev') setupGoogleButton();
+
+/* ---------- Printable Coloring Pages (admin uploads PDFs; everyone views and downloads one page at a time) ---------- */
+const CP = { items: [], loaded: false, loading: false, q: '', view: null, staged: [], urls: {} };
+const CP_BUCKET = 'coloring';
+ICONS.coloring = '<svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.5-.8 1.5-1.5 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.8.7-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.2-4-7.8-9-7.8z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg>';
+['parent', 'teacher', 'staff'].forEach((r) => {
+  const list = MENUS[r]; if (!list || list.some((i) => i.key === 'coloring')) return;
+  const at = list.findIndex((i) => /settings/.test(i.key));
+  list.splice(at < 0 ? list.length : at, 0, { key: 'coloring', label: 'Coloring Pages', section: 'coloring' });
+});
+const cpIsAdmin = () => me && me.dbRole === 'admin';
+async function cpLoad(force) {
+  if (!sb || !me || CP.loading || (CP.loaded && !force)) return;
+  CP.loading = true;
+  try {
+    const r = await sb.from('coloring_pages').select('id,title,file_path,thumb_path,created_at').order('created_at', { ascending: false }).order('sort_order').limit(2000);
+    if (!r.error) { CP.items = r.data || []; CP.loaded = true; await cpSignThumbs(CP.items.slice(0, 60)); }
+  } finally { CP.loading = false; }
+}
+async function cpSignThumbs(items) {
+  const need = items.filter((x) => x.thumb_path && !CP.urls[x.thumb_path]).map((x) => x.thumb_path);
+  if (!need.length) return;
+  const r = await sb.storage.from(CP_BUCKET).createSignedUrls(need, 3600);
+  if (!r.error) (r.data || []).forEach((d) => { if (d.signedUrl) CP.urls[d.path] = d.signedUrl; });
+}
+function cpThumb(x) { return CP.urls[x.thumb_path] || ''; }
+function loadScript(src) {
+  return new Promise((res, rej) => { if ([...document.scripts].some((s) => s.src === src)) return res(); const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src)); document.head.appendChild(s); });
+}
+async function cpLibs() {
+  await loadScript('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js');
+  await loadScript('https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js');
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+}
+function cpGuessTitle(items, pageH) {
+  // The title is the biggest text near the top of the page.
+  const rows = items.filter((t) => t.str && t.str.trim()).map((t) => ({ s: t.str.trim(), size: Math.abs(t.transform[3]) || Math.abs(t.transform[0]), y: t.transform[5] }));
+  if (!rows.length) return '';
+  const top = rows.filter((r) => r.y > pageH * 0.45);
+  const pool = top.length ? top : rows;
+  const max = Math.max(...pool.map((r) => r.size));
+  const big = pool.filter((r) => r.size >= max * 0.85).sort((a, b) => b.y - a.y);
+  const line = big.filter((r) => Math.abs(r.y - big[0].y) < max * 1.6).map((r) => r.s).join(' ');
+  return line.replace(/\s+/g, ' ').trim().slice(0, 120);
+}
+async function cpReadFiles(files, onProgress) {
+  await cpLibs();
+  const out = [];
+  for (const file of files) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const src = await PDFLib.PDFDocument.load(bytes, { ignoreEncryption: true });
+    const view = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+    const base = file.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ').trim();
+    for (let i = 0; i < src.getPageCount(); i++) {
+      onProgress && onProgress(`Reading ${file.name}: page ${i + 1} of ${src.getPageCount()}`);
+      const one = await PDFLib.PDFDocument.create();
+      const [pg] = await one.copyPages(src, [i]);
+      one.addPage(pg);
+      const pdfBytes = await one.save();
+      const p = await view.getPage(i + 1);
+      const vp1 = p.getViewport({ scale: 1 });
+      let title = '';
+      try { title = cpGuessTitle((await p.getTextContent()).items, vp1.height); } catch (e) {}
+      const scale = 360 / vp1.width;
+      const vp = p.getViewport({ scale });
+      const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+      await p.render({ canvasContext: ctx, viewport: vp }).promise;
+      const thumb = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.82));
+      out.push({ title: title || `${base} ${i + 1}`, fromText: !!title, pdf: new Blob([pdfBytes], { type: 'application/pdf' }), thumb, preview: URL.createObjectURL(thumb) });
+    }
+  }
+  return out;
+}
+async function cpSaveAll(staged, onProgress) {
+  let done = 0; const errors = [];
+  for (const st of staged) {
+    const id = newUuid();
+    const fp = `pages/${id}.pdf`, tp = `thumbs/${id}.jpg`;
+    onProgress && onProgress(`Saving ${done + 1} of ${staged.length}…`);
+    let r = await sb.storage.from(CP_BUCKET).upload(fp, st.pdf, { contentType: 'application/pdf', upsert: false });
+    if (r.error) { errors.push(r.error.message); continue; }
+    r = await sb.storage.from(CP_BUCKET).upload(tp, st.thumb, { contentType: 'image/jpeg', upsert: false });
+    if (r.error) { errors.push(r.error.message); continue; }
+    const ins = await sb.from('coloring_pages').insert({ id, title: st.title.trim() || 'Coloring page', file_path: fp, thumb_path: tp, sort_order: done });
+    if (ins.error) { errors.push(ins.error.message); continue; }
+    done += 1;
+  }
+  return { done, errors };
+}
+async function cpDownload(x) {
+  const r = await sb.storage.from(CP_BUCKET).createSignedUrl(x.file_path, 600, { download: `${(x.title || 'coloring-page').replace(/[^\w\- ]+/g, '').trim() || 'coloring-page'}.pdf` });
+  if (r.error || !r.data) return false;
+  const a = document.createElement('a'); a.href = r.data.signedUrl; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
+  return true;
+}
+function renderColoring() {
+  const box = $('coloring').querySelector('.colorapp');
+  cpDraw(box);
+  cpLoad().then(() => { if (currentView === 'coloring' && !(document.activeElement && box.contains(document.activeElement) && /INPUT/.test(document.activeElement.tagName))) cpDraw(box); });
+}
+function cpDraw(box) {
+  box.innerHTML = '';
+  if (CP.view) return cpDrawView(box);
+  if (cpIsAdmin()) box.appendChild(cpUploadPanel(box));
+  const q = mk('input', { type: 'search', placeholder: 'Search coloring pages', 'aria-label': 'Search coloring pages', maxlength: 80 });
+  q.value = CP.q;
+  const grid = mk('ul', { cls: 'cp-grid' });
+  box.append(mk('div', { cls: 'cp-top' }, q), grid);
+  const paint = () => {
+    grid.innerHTML = '';
+    const n = CP.q.trim().toLowerCase();
+    const list = CP.items.filter((x) => !n || (x.title || '').toLowerCase().includes(n));
+    if (!CP.loaded && !list.length) return grid.appendChild(mk('li', { cls: 'muted', text: 'Loading…' }));
+    if (!list.length) return grid.appendChild(mk('li', { cls: 'muted', text: n ? 'No pages match.' : 'No coloring pages yet.' }));
+    cpSignThumbs(list.slice(0, 120)).then(() => grid.querySelectorAll('img[data-tp]').forEach((im) => { if (!im.src && CP.urls[im.dataset.tp]) im.src = CP.urls[im.dataset.tp]; }));
+    list.forEach((x) => {
+      const img = mk('img', { alt: '', loading: 'lazy' }); img.dataset.tp = x.thumb_path || ''; if (cpThumb(x)) img.src = cpThumb(x);
+      grid.appendChild(mk('li', null, mk('button', { type: 'button', cls: 'cp-card', on: () => { CP.view = x.id; cpDraw(box); } }, img, mk('strong', { text: x.title }))));
+    });
+  };
+  q.oninput = () => { CP.q = q.value; paint(); };
+  paint();
+}
+function cpUploadPanel(box) {
+  const panel = mk('div', { cls: 'cp-upload' });
+  const note = mk('p', { cls: 'msg', role: 'status' });
+  const file = mk('input', { type: 'file', accept: 'application/pdf,.pdf', multiple: true, style: 'margin:6px 0' });
+  panel.append(mk('h2', { text: 'Add coloring pages' }), mk('p', { cls: 'muted', text: 'Choose one or more PDFs. Each page becomes its own printable PDF, named from the title on the page. Check the names, then save.' }), file, note);
+  const list = mk('ul', { cls: 'cp-review' });
+  const save = mk('button', { type: 'button', text: 'Save all' });
+  const cancel = mk('button', { type: 'button', cls: 'secondary', text: 'Cancel' });
+  const drawStaged = () => {
+    list.innerHTML = '';
+    CP.staged.forEach((st, i) => {
+      const t = mk('input', { maxlength: 120, 'aria-label': `Title for page ${i + 1}` }); t.value = st.title; t.oninput = () => { st.title = t.value; };
+      list.appendChild(mk('li', null, mk('img', { src: st.preview, alt: '' }), t, mk('button', { type: 'button', cls: 'secondary', text: '✕', 'aria-label': 'Remove this page', on: () => { CP.staged.splice(i, 1); drawStaged(); } })));
+    });
+    save.textContent = `Save all (${CP.staged.length})`;
+    const showing = CP.staged.length > 0;
+    list.hidden = !showing; save.hidden = !showing; cancel.hidden = !showing;
+  };
+  file.onchange = async () => {
+    const files = [...file.files].filter((f) => /pdf$/i.test(f.type) || /\.pdf$/i.test(f.name));
+    if (!files.length) return msg(note, 'Please choose PDF files.', true);
+    try {
+      msg(note, 'Reading your PDFs…');
+      const got = await cpReadFiles(files, (t) => msg(note, t));
+      CP.staged.push(...got);
+      const guessed = got.filter((g) => !g.fromText).length;
+      msg(note, `${got.length} page${got.length === 1 ? '' : 's'} ready.${guessed ? (guessed === 1 ? ' 1 page had no readable title, so it is named from the file. Please check that name.' : ` ${guessed} pages had no readable title, so they are named from the file. Please check those names.`) : ' Check the names, then tap Save all.'}`);
+      drawStaged();
+    } catch (e) { msg(note, `Could not read that PDF: ${e.message}`, true); }
+    file.value = '';
+  };
+  save.onclick = async () => {
+    save.disabled = true; cancel.disabled = true;
+    const res = await cpSaveAll(CP.staged, (t) => msg(note, t));
+    CP.staged.forEach((st) => URL.revokeObjectURL(st.preview));
+    CP.staged = [];
+    save.disabled = false; cancel.disabled = false;
+    await cpLoad(true);
+    cpDraw(box);
+    const n2 = box.querySelector('.cp-upload .msg');
+    if (n2) msg(n2, res.errors.length ? `Saved ${res.done}. ${res.errors.length} could not be saved: ${res.errors[0]}` : `Saved ${res.done} coloring page${res.done === 1 ? '' : 's'}.`, !!res.errors.length);
+  };
+  cancel.onclick = () => { CP.staged.forEach((st) => URL.revokeObjectURL(st.preview)); CP.staged = []; drawStaged(); msg(note, ''); };
+  panel.append(list, mk('div', { cls: 'row-actions' }, save, cancel));
+  drawStaged();
+  return panel;
+}
+function cpDrawView(box) {
+  const list = CP.items.filter((x) => !CP.q.trim() || (x.title || '').toLowerCase().includes(CP.q.trim().toLowerCase()));
+  const idx = list.findIndex((x) => x.id === CP.view);
+  const x = list[idx] || CP.items.find((y) => y.id === CP.view);
+  if (!x) { CP.view = null; return cpDraw(box); }
+  const note = mk('p', { cls: 'msg', role: 'status' });
+  const img = mk('img', { alt: x.title }); if (cpThumb(x)) img.src = cpThumb(x); else cpSignThumbs([x]).then(() => { img.src = cpThumb(x); });
+  const go = (d) => { const n = list[idx + d]; if (n) { CP.view = n.id; cpDraw(box); } };
+  const nav = mk('div', { cls: 'cp-nav' },
+    mk('button', { type: 'button', cls: 'secondary', text: '‹ Previous', on: () => go(-1), disabled: idx <= 0 }),
+    mk('button', { type: 'button', text: 'Download PDF', on: async () => { msg(note, 'Preparing your PDF…'); msg(note, (await cpDownload(x)) ? '' : 'Could not download. Please try again.', false); } }),
+    mk('button', { type: 'button', cls: 'secondary', text: 'Next ›', on: () => go(1), disabled: idx < 0 || idx >= list.length - 1 }));
+  const view = mk('div', { cls: 'cp-view' }, img, mk('h2', { text: x.title }), nav, note);
+  if (cpIsAdmin()) {
+    const t = mk('input', { maxlength: 120, 'aria-label': 'Title' }); t.value = x.title;
+    view.append(mk('div', { cls: 'cp-nav' }, t,
+      mk('button', { type: 'button', cls: 'secondary', text: 'Rename', on: async () => { const v = t.value.trim(); if (!v) return; const r = await sb.from('coloring_pages').update({ title: v }).eq('id', x.id); if (r.error) return msg(note, 'Could not rename.', true); x.title = v; cpDraw(box); } }),
+      deleteButton('Delete', async () => { await sb.storage.from(CP_BUCKET).remove([x.file_path, x.thumb_path].filter(Boolean)); const r = await sb.from('coloring_pages').delete().eq('id', x.id); if (r.error) return msg(note, 'Could not delete.', true); CP.items = CP.items.filter((y) => y.id !== x.id); CP.view = null; cpDraw(box); })));
+  }
+  box.append(mk('button', { type: 'button', cls: 'back-home', text: '‹ All coloring pages', on: () => { CP.view = null; cpDraw(box); } }), view);
+}
+P_RENDER.coloring = () => { CP.view = null; renderColoring(); };
+// Dashboard card
+function cpDrawWidget(secId) {
+  const sec = $(secId); if (!sec || !me) return;
+  let w = sec.querySelector(':scope > .cp-widget');
+  if (!w) {
+    w = mk('div', { cls: 'msg-widget cp-widget' });
+    const after = sec.querySelector(':scope > .msg-widget');
+    if (after && after.nextSibling) sec.insertBefore(w, after.nextSibling); else sec.appendChild(w);
+  }
+  w.innerHTML = '';
+  w.append(mk('div', { cls: 'msg-widget-head' }, mk('h2', null, 'Printable Coloring Pages'),
+    mk('div', { cls: 'msg-widget-actions' }, mk('button', { type: 'button', cls: 'secondary', text: 'View all', on: () => goto('coloring') }))));
+  const grid = mk('div', { cls: 'cp-widget-grid' });
+  const top = CP.items.slice(0, 4);
+  if (!CP.loaded && !top.length) grid.appendChild(mk('p', { cls: 'muted', text: 'Loading…' }));
+  else if (!top.length) grid.appendChild(mk('p', { cls: 'muted', text: cpIsAdmin() ? 'No coloring pages yet. Tap View all to add some.' : 'New coloring pages will appear here.' }));
+  top.forEach((x) => {
+    const img = mk('img', { alt: '', loading: 'lazy' }); if (cpThumb(x)) img.src = cpThumb(x);
+    grid.appendChild(mk('button', { type: 'button', cls: 'cp-card', on: () => { goto('coloring'); CP.view = x.id; cpDraw($('coloring').querySelector('.colorapp')); } }, img, mk('strong', { text: x.title })));
+  });
+  w.appendChild(grid);
+}
+(() => {
+  const orig = goto;
+  goto = function (key) {
+    const r = orig.apply(this, arguments);
+    if (['home', 'welcome', 'tHome'].includes(currentView)) { cpDrawWidget(currentView); cpLoad().then(() => { if (['home', 'welcome', 'tHome'].includes(currentView)) cpDrawWidget(currentView); }); }
+    return r;
+  };
+})();
 </script>
 </body>
 </html>
