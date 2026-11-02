@@ -974,6 +974,22 @@ a.qa-tile{text-decoration:none;color:inherit}
         <button type="button" id="consentSubmit">Submit and continue</button>
         <button type="button" class="link" id="consentSignOut">Use a different account</button>
       </div>
+      <div id="teacherGate" class="hidden" style="text-align:left">
+        <p class="muted" id="teacherWho" style="margin:0 0 10px"></p>
+        <p style="margin:0 0 6px"><strong>Teacher Agreement</strong></p>
+        <div class="consent-box" style="margin:0 0 12px;font-size:14px;text-align:left;line-height:1.5;max-height:42vh;overflow-y:auto">
+          <p style="margin:0 0 8px">Before you start teaching with BeAIReadyCo AI School, please read and agree to the following.</p>
+          <p style="margin:0 0 8px"><strong>1. Our materials stay with us.</strong> Lessons, slides, quizzes, activities, worksheets, videos and other materials in this app belong to BeAIReadyCo. Use them only to teach BeAIReadyCo classes.</p>
+          <p style="margin:0 0 8px"><strong>2. No copying or sharing.</strong> Do not copy, download, screenshot, record, print, forward, post, sell or share the materials, and do not use them to build your own lessons or courses, unless BeAIReadyCo gives you written permission.</p>
+          <p style="margin:0 0 8px"><strong>3. Student privacy.</strong> Use student and family information only for your BeAIReadyCo classes. Do not take or share photos or videos of students, and do not share names or personal details outside the app. Contact families through the BeAIReadyCo app unless BeAIReadyCo tells you otherwise.</p>
+          <p style="margin:0 0 8px"><strong>4. Child safety.</strong> Follow BeAIReadyCo safety rules, hold online classes only in tools BeAIReadyCo approves, and report any safety concern to BeAIReadyCo right away.</p>
+          <p style="margin:0 0 8px"><strong>5. Your account.</strong> Keep your sign-in private and do not let anyone else use it. BeAIReadyCo may remove your access at any time.</p>
+          <p style="margin:0 0 8px"><strong>6. After you stop teaching.</strong> Points 1 to 3 still apply after you stop teaching with BeAIReadyCo.</p>
+          <p style="margin:0">Questions: beaireadyco@gmail.com</p>
+        </div>
+        <button type="button" id="teacherAgree">I agree and continue</button>
+        <button type="button" class="link" id="teacherSignOut">Use a different account</button>
+      </div>
       <div id="approvalGate" class="hidden" style="text-align:left">
         <p class="muted" id="gateWho" style="margin:0 0 10px"></p>
         <p id="gateText" style="margin:0 0 14px">Your account needs approval from BeAIReadyCo before you can log in.</p>
@@ -2235,7 +2251,7 @@ async function loadTeacherChildren() {
   if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
 }
 // ---- Auto-update: if a newer version of the app is published, reload into it (no need to close the app) ----
-const APP_BUILD = '20261101235806';
+const APP_BUILD = '20261102002847';
 async function checkForUpdate() {
   try {
     const r = await fetch('/version.txt?t=' + Date.now(), { cache: 'no-store' });
@@ -2392,6 +2408,27 @@ function showApprovalGate(user, status) {
   }
 }
 const CONSENT_VERSION = '2026-10-30';
+const TEACHER_AGREEMENT_VERSION = 'teacher-2026-11-01';
+function showTeacherGate(user) {
+  if (gateOldTitle === null) gateOldTitle = $('authTitle').textContent;
+  $('authTitle').textContent = 'One more step';
+  $('authForm').classList.add('hidden');
+  $('approvalGate').classList.add('hidden');
+  $('consentGate').classList.add('hidden');
+  $('teacherGate').classList.remove('hidden');
+  msg($('authMsg'), '');
+  $('teacherWho').textContent = `Signed in as ${user.email || ''}`;
+  $('teacherAgree').disabled = false;
+}
+$('teacherAgree').onclick = async () => {
+  const btn = $('teacherAgree');
+  btn.disabled = true;
+  const rec = await sb.rpc('record_consent', { p_version: TEACHER_AGREEMENT_VERSION });
+  if (rec.error) { btn.disabled = false; return msg($('authMsg'), 'Could not save your agreement. Please try again.', true); }
+  $('teacherGate').classList.add('hidden');
+  try { await loadSupabaseProfile(); } catch (e) { msg($('authMsg'), 'Something went wrong signing in. Please try again.', true); }
+};
+$('teacherSignOut').onclick = () => signOut();
 function showConsentGate(user) {
   if (gateOldTitle === null) gateOldTitle = $('authTitle').textContent;
   $('authTitle').textContent = 'One more step';
@@ -2429,6 +2466,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) gate
 function hideApprovalGate() {
   stopGateWatch();
   $('consentGate').classList.add('hidden');
+  $('teacherGate').classList.add('hidden');
   $('approvalGate').classList.add('hidden');
   $('authForm').classList.remove('hidden');
   if (gateOldTitle !== null) { $('authTitle').textContent = gateOldTitle; gateOldTitle = null; }
@@ -2468,11 +2506,15 @@ async function loadSupabaseProfile() {
   if (!data || !data.session) return;
   const user = data.session.user;
   let { data: prof, error } = await sb.from('profiles').select('role, full_name').eq('id', user.id).maybeSingle();
-  if (!prof && !error) {
-    await sb.rpc('claim_invite');
-    ({ data: prof, error } = await sb.from('profiles').select('role, full_name').eq('id', user.id).maybeSingle());
-  }
   if (!error && (!prof || prof.role === 'parent')) {
+    const ci = await sb.rpc('claim_invite');
+    if (!prof || (ci && ci.data === 'teacher')) ({ data: prof, error } = await sb.from('profiles').select('role, full_name').eq('id', user.id).maybeSingle());
+  }
+  if (!error && prof && prof.role === 'teacher') {
+    const tr = await sb.from('parent_consents').select('id').eq('user_id', user.id).eq('notice_version', TEACHER_AGREEMENT_VERSION).maybeSingle();
+    if (!tr.error && !tr.data) { showTeacherGate(user); return; }
+  }
+  if (!error && prof && prof.role === 'parent') {
     const cr = await sb.from('parent_consents').select('id').eq('user_id', user.id).eq('notice_version', CONSENT_VERSION).maybeSingle();
     if (!cr.error && !cr.data) { showConsentGate(user); return; }
   }
