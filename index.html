@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>BeAIReady AI School</title>
 <link rel="manifest" href="manifest.json">
@@ -643,10 +643,10 @@ main.anon #auth .top-brand .form-ai{background:linear-gradient(90deg,#ffffff 0%,
 .p-qa strong{font-size:17px}
 .p-qa-ic{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:rgba(255,255,255,.7);margin-bottom:6px}
 .p-qa-ic svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.p-qa-blue{background:#e8efff;color:#2563eb}.p-qa-blue small{color:#334155}
+.p-qa-blue{background:#e8efff;color:#1d4ed8}.p-qa-blue small{color:#334155}
 .p-qa-purple{background:#f1ecff;color:#6d3cf5}
-.p-qa-yellow{background:#fff7d6;color:#b7791f}
-.p-qa-green{background:#e3f8ee;color:#16a34a}
+.p-qa-yellow{background:#fff7d6;color:#8a5a0f}
+.p-qa-green{background:#e3f8ee;color:#15803d}
 .p-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .p-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 1px 2px rgba(20,30,70,.04),0 10px 26px rgba(20,30,70,.05);min-width:0}
 .p-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
@@ -910,6 +910,12 @@ body.role-teacher #pProfBtn{cursor:pointer}
 #auth .login-card-box button.google{height:52px;width:100%;margin-top:8px;font-size:16px;border-radius:16px}
 #auth .login-card-box #toggleMode{margin-top:6px;align-self:center}
 a.qa-tile{text-decoration:none;color:inherit}
+</style>
+<style id="a11y">
+@media (max-width:600px){#auth .login-card-box button.link{color:#2f5fd0}
+ input,select,textarea,main.anon #auth .login-card-box input{font-size:16px!important}}
+.p-empty{color:#4f5878}
+:focus-visible{outline:3px solid #2f5fd0;outline-offset:2px}
 </style>
 </head>
 <body>
@@ -2285,7 +2291,7 @@ async function loadTeacherChildren() {
   if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
 }
 // ---- Auto-update: if a newer version of the app is published, reload into it (no need to close the app) ----
-const APP_BUILD = '20261102203011';
+const APP_BUILD = '20261102235227';
 async function checkForUpdate() {
   try {
     const r = await fetch('/version.txt?t=' + Date.now(), { cache: 'no-store' });
