@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>BeAIReady AI School</title>
 <link rel="manifest" href="manifest.json">
@@ -2254,7 +2254,7 @@ async function loadTeacherChildren() {
   if (!r.error) replaceAll(DB.children, r.data.map(mapChildRow));
 }
 // ---- Auto-update: if a newer version of the app is published, reload into it (no need to close the app) ----
-const APP_BUILD = '20261102021308';
+const APP_BUILD = '20261102171456';
 async function checkForUpdate() {
   try {
     const r = await fetch('/version.txt?t=' + Date.now(), { cache: 'no-store' });
